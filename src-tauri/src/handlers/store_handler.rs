@@ -176,18 +176,37 @@ pub async fn search_stores(
     params.push(Box::new(limit));
     params.push(Box::new(offset));
 
-    let mut query = sqlx::query_as::<_, StoreWithStats>(&base_query);
+    let mut query = sqlx::query(&base_query);
     for param in params {
         query = query.bind(param);
     }
 
-    let stores = query
+    let rows = query
         .fetch_all(&pool)
         .await
         .map_err(|e| ApiError {
             message: format!("Failed to search stores: {}", e),
             code: Some("DATABASE_ERROR".to_string()),
         })?;
+
+    let stores = rows.into_iter().map(|row| StoreWithStats {
+        id: row.get("id"),
+        name: row.get("name"),
+        address: row.get("address"),
+        city: row.get("city"),
+        state: row.get("state"),
+        pincode: row.get("pincode"),
+        phone: row.get("phone"),
+        email: row.get("email"),
+        gstin: row.get("gstin"),
+        pan_number: row.get("pan_number"),
+        owner_name: row.get("owner_name"),
+        is_active: row.get("is_active"),
+        total_invoices: row.get("total_invoices"),
+        monthly_revenue: row.get("monthly_revenue"),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+    }).collect();
 
     Ok(stores)
 }

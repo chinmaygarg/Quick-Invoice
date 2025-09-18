@@ -143,13 +143,13 @@ pub async fn create_invoice(
             code: Some("SERVICE_NOT_FOUND".to_string()),
         })?;
 
-        let base_rate: f64 = service_row.get("base_rate");
+        let base_rate: f64 = service_row.get("base_price");
         let gst_rate: f64 = service_row.get("gst_rate");
 
         // Calculate variant rate if applicable
         let variant_rate = if let Some(variant_id) = item_request.variant_id {
             let variant_row = sqlx::query(
-                "SELECT rate_multiplier FROM service_variants WHERE id = ? AND service_id = ?"
+                "SELECT price_multiplier FROM service_variants WHERE id = ? AND service_id = ?"
             )
             .bind(variant_id)
             .bind(item_request.service_id)
@@ -160,7 +160,7 @@ pub async fn create_invoice(
                 code: Some("DATABASE_ERROR".to_string()),
             })?
             .map(|row| {
-                let multiplier: f64 = row.get("rate_multiplier");
+                let multiplier: f64 = row.get("price_multiplier");
                 base_rate * multiplier
             })
             .unwrap_or(base_rate)
@@ -228,7 +228,7 @@ pub async fn create_invoice(
                 code: Some("ADDON_NOT_FOUND".to_string()),
             })?;
 
-            let addon_rate: f64 = addon_row.get("rate");
+            let addon_rate: f64 = addon_row.get("price");
             let addon_gst_rate: f64 = addon_row.get("gst_rate");
 
             let addon_pricing = PricingEngine::calculate_service_pricing(
@@ -422,7 +422,7 @@ pub async fn get_invoice_by_id(
             InvoiceAddonDetail {
                 addon_name: addon_row.get("addon_name"),
                 quantity: addon_row.get("qty"),
-                rate: addon_row.get("rate"),
+                rate: addon_row.get("price"),
                 amount: addon_row.get("amount"),
             }
         }).collect();

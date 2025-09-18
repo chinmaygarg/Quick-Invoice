@@ -234,7 +234,7 @@ pub async fn update_customer(
     query = query.bind(customer_id);
 
     let result = query
-        .fetch_one(pool)
+        .fetch_one(&pool)
         .await
         .map_err(|e| ApiError {
             message: format!("Failed to update customer: {}", e),
@@ -245,7 +245,10 @@ pub async fn update_customer(
         id: result.get("id"),
         name: result.get("name"),
         phone: result.get("phone"),
+        email: result.get("email"),
         address: result.get("address"),
+        notes: result.get("notes"),
+        is_active: result.get("is_active"),
         created_at: result.get("created_at"),
         updated_at: result.get("updated_at"),
     })
@@ -267,7 +270,7 @@ pub async fn delete_customer(
     // Check if customer has any invoices
     let invoice_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM invoices WHERE customer_id = ?")
         .bind(customer_id)
-        .fetch_one(pool)
+        .fetch_one(&pool)
         .await
         .map_err(|e| ApiError {
             message: format!("Database error: {}", e),
@@ -372,18 +375,33 @@ pub async fn get_customers_with_stats(
     params.push(Box::new(limit));
     params.push(Box::new(offset));
 
-    let mut query = sqlx::query_as::<_, CustomerWithStats>(&base_query);
+    let mut query = sqlx::query(&base_query);
     for param in params {
         query = query.bind(param);
     }
 
-    let customers = query
+    let rows = query
         .fetch_all(&pool)
         .await
         .map_err(|e| ApiError {
             message: format!("Failed to fetch customers with stats: {}", e),
             code: Some("DATABASE_ERROR".to_string()),
         })?;
+
+    let customers = rows.into_iter().map(|row| CustomerWithStats {
+        id: row.get("id"),
+        name: row.get("name"),
+        phone: row.get("phone"),
+        email: row.get("email"),
+        address: row.get("address"),
+        notes: row.get("notes"),
+        is_active: row.get("is_active"),
+        total_orders: row.get("total_orders"),
+        total_spent: row.get("total_spent"),
+        last_order_date: row.get("last_order_date"),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+    }).collect();
 
     Ok(customers)
 }

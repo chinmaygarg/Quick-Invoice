@@ -221,18 +221,34 @@ pub async fn search_services(
     params.push(Box::new(limit));
     params.push(Box::new(offset));
 
-    let mut query = sqlx::query_as::<_, ServiceWithDetails>(&base_query);
+    let mut query = sqlx::query(&base_query);
     for param in params {
         query = query.bind(param);
     }
 
-    let services = query
+    let rows = query
         .fetch_all(&pool)
         .await
         .map_err(|e| ApiError {
             message: format!("Failed to search services: {}", e),
             code: Some("DATABASE_ERROR".to_string()),
         })?;
+
+    let services = rows.into_iter().map(|row| ServiceWithDetails {
+        id: row.get("id"),
+        name: row.get("name"),
+        category: row.get("category"),
+        description: row.get("description"),
+        base_price: row.get("base_price"),
+        gst_rate: row.get("gst_rate"),
+        unit: row.get("unit"),
+        min_quantity: row.get("min_quantity"),
+        is_active: row.get("is_active"),
+        variants_count: row.get("variants_count"),
+        addons_count: row.get("addons_count"),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+    }).collect();
 
     Ok(services)
 }
