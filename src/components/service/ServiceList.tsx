@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useApp } from '@/contexts/AppContext';
@@ -29,22 +29,42 @@ export function ServiceList() {
   const [services, setServices] = useState<Service[]>([]);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'category'>('category');
   const [showInactiveServices, setShowInactiveServices] = useState(false);
   const [selectedServices, setSelectedServices] = useState<number[]>([]);
   const [showBulkActions, setShowBulkActions] = useState(false);
 
+  // Ref for search input to maintain focus
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Debounce search query to avoid triggering API calls on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 700);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   useEffect(() => {
     loadServices();
-  }, [searchQuery, selectedCategory, showInactiveServices]);
+  }, [debouncedSearchQuery, selectedCategory, showInactiveServices]);
 
   const loadServices = async () => {
     try {
-      setIsLoading(true);
+      // Use isSearching for search operations, isLoading only for initial page load
+      if (debouncedSearchQuery || selectedCategory !== 'all') {
+        setIsSearching(true);
+      } else {
+        setIsLoading(true);
+      }
+
       const result = await invoke('search_services', {
-        query: searchQuery,
+        query: debouncedSearchQuery,
         category: selectedCategory === 'all' ? null : selectedCategory,
         includeInactive: showInactiveServices,
         limit: 100,
@@ -63,6 +83,7 @@ export function ServiceList() {
       });
     } finally {
       setIsLoading(false);
+      setIsSearching(false);
     }
   };
 
@@ -221,18 +242,24 @@ export function ServiceList() {
             </label>
             <div className="relative">
               <input
+                ref={searchInputRef}
                 id="service-search"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by service name or description..."
-                className="form-input pl-10"
+                className="form-input pl-10 pr-10"
                 data-testid="service-search"
               />
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
+              </div>
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                {isSearching ? (
+                  <div className="spinner w-4 h-4" />
+                ) : null}
               </div>
             </div>
           </div>
@@ -299,7 +326,7 @@ export function ServiceList() {
           </svg>
           <h3 className="text-lg font-medium text-gray-900 mb-2">No services found</h3>
           <p className="text-gray-500 mb-6">
-            {searchQuery || selectedCategory !== 'all'
+            {debouncedSearchQuery || selectedCategory !== 'all'
               ? 'Try adjusting your search criteria'
               : 'Get started by adding your first service'}
           </p>

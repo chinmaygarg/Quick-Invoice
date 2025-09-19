@@ -1,21 +1,47 @@
 use anyhow::{Context, Result};
-use sqlx::{sqlite::SqlitePool, Row, Sqlite, Transaction};
-use std::path::Path;
-use tokio::fs;
+use sqlx::{sqlite::SqlitePool, Sqlite, Transaction};
+use std::path::PathBuf;
+use tokio::fs::{self, File};
+use tauri::AppHandle;
 
 pub struct DatabaseManager {
     pool: SqlitePool,
 }
 
 impl DatabaseManager {
-    pub async fn new() -> Result<Self> {
-        let database_url = "sqlite:database.sqlite";
+    pub async fn new(app_handle: &AppHandle) -> Result<Self> {
+        let database_path = Self::get_database_path(app_handle)?;
 
-        let pool = SqlitePool::connect(database_url)
+        // Create the app data directory if it doesn't exist
+        if let Some(parent) = database_path.parent() {
+            fs::create_dir_all(parent)
+                .await
+                .context("Failed to create app data directory")?;
+        }
+
+        // Create the database file if it doesn't exist
+        if !database_path.exists() {
+            File::create(&database_path)
+                .await
+                .context("Failed to create database file")?;
+        }
+
+        let database_url = format!("sqlite:{}", database_path.display());
+
+        let pool = SqlitePool::connect(&database_url)
             .await
             .context("Failed to connect to database")?;
 
         Ok(Self { pool })
+    }
+
+    pub fn get_database_path(app_handle: &AppHandle) -> Result<PathBuf> {
+        let app_data_dir = app_handle
+            .path_resolver()
+            .app_data_dir()
+            .context("Failed to get app data directory")?;
+
+        Ok(app_data_dir.join("database.sqlite"))
     }
 
     pub async fn new_with_url(database_url: &str) -> Result<Self> {
@@ -65,13 +91,13 @@ impl DatabaseManager {
         self.pool.clone()
     }
 
-    pub async fn backup_to_file(&self, backup_path: &str) -> Result<()> {
+    pub async fn backup_to_file(&self, app_handle: &AppHandle, backup_path: &str) -> Result<()> {
         // Simple backup by copying the database file
         // In production, you might want to use SQLite's backup API
-        let source_path = "database.sqlite";
+        let source_path = Self::get_database_path(app_handle)?;
 
-        if Path::new(source_path).exists() {
-            fs::copy(source_path, backup_path)
+        if source_path.exists() {
+            fs::copy(&source_path, backup_path)
                 .await
                 .context("Failed to copy database file")?;
         }
@@ -79,12 +105,12 @@ impl DatabaseManager {
         Ok(())
     }
 
-    pub async fn restore_from_file(&self, backup_path: &str) -> Result<()> {
+    pub async fn restore_from_file(&self, app_handle: &AppHandle, backup_path: &str) -> Result<()> {
         // Close current connections and restore from backup
         self.pool.close().await;
 
-        let target_path = "database.sqlite";
-        fs::copy(backup_path, target_path)
+        let target_path = Self::get_database_path(app_handle)?;
+        fs::copy(backup_path, &target_path)
             .await
             .context("Failed to restore database file")?;
 

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 
 // Types
@@ -105,19 +105,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
   // Helper functions
-  const setLoading = (loading: boolean) => {
+  const setLoading = useCallback((loading: boolean) => {
     dispatch({ type: 'SET_LOADING', payload: loading });
-  };
+  }, []);
 
-  const setError = (error: string | null) => {
+  const setError = useCallback((error: string | null) => {
     dispatch({ type: 'SET_ERROR', payload: error });
-  };
+  }, []);
 
-  const clearError = () => {
+  const clearError = useCallback(() => {
     dispatch({ type: 'SET_ERROR', payload: null });
-  };
+  }, []);
 
-  const showNotification = (notification: Omit<Notification, 'id' | 'timestamp'>) => {
+  const showNotification = useCallback((notification: Omit<Notification, 'id' | 'timestamp'>) => {
     const id = Math.random().toString(36).substr(2, 9);
     const fullNotification: Notification = {
       ...notification,
@@ -134,26 +134,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: 'REMOVE_NOTIFICATION', payload: id });
       }, 5000);
     }
-  };
+  }, []);
 
-  const refreshStores = async () => {
+  const refreshStores = useCallback(async (skipLoading = false) => {
     try {
-      setLoading(true);
+      if (!skipLoading) {
+        setLoading(true);
+      }
       const stores = await invoke<Store[]>('get_stores');
       dispatch({ type: 'SET_STORES', payload: stores });
 
-      // Set default store if none selected
-      if (!state.currentStore && stores.length > 0) {
+      // Set default store only during initialization
+      if (stores.length > 0 && skipLoading) {
         dispatch({ type: 'SET_CURRENT_STORE', payload: stores[0] });
       }
     } catch (error) {
       setError(`Failed to load stores: ${error}`);
     } finally {
-      setLoading(false);
+      if (!skipLoading) {
+        setLoading(false);
+      }
     }
-  };
+  }, [setLoading, setError]);
 
-  const refreshRecentCustomers = async () => {
+  const refreshRecentCustomers = useCallback(async () => {
     try {
       const customers = await invoke<Customer[]>('search_customers', {
         query: null,
@@ -163,19 +167,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Failed to load recent customers:', error);
     }
-  };
+  }, []);
 
-  const selectStore = (store: Store) => {
+  const selectStore = useCallback((store: Store) => {
     dispatch({ type: 'SET_CURRENT_STORE', payload: store });
-  };
+  }, []);
 
   // Initialize app data
   useEffect(() => {
     const initializeApp = async () => {
       try {
         setLoading(true);
+        // Use skipLoading=true to prevent nested loading state updates
         await Promise.all([
-          refreshStores(),
+          refreshStores(true),
           refreshRecentCustomers(),
         ]);
       } catch (error) {
@@ -186,9 +191,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     initializeApp();
-  }, []);
+  }, []); // Empty dependency array is correct - we only want this to run once on mount
 
-  const contextValue: AppContextType = {
+  const contextValue: AppContextType = useMemo(() => ({
     state,
     dispatch,
     setLoading,
@@ -198,7 +203,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     refreshStores,
     refreshRecentCustomers,
     selectStore,
-  };
+  }), [state, setLoading, setError, showNotification, clearError, refreshStores, refreshRecentCustomers, selectStore]);
 
   return (
     <AppContext.Provider value={contextValue}>

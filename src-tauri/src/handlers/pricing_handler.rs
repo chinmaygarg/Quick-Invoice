@@ -9,10 +9,7 @@ pub async fn calculate_service_pricing(
     state: State<'_, crate::AppState>,
     request: PricingRequest,
 ) -> ApiResult<PricingResult> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     // Validate the pricing request
     PricingEngine::validate_pricing_request(&request)?;
@@ -123,10 +120,7 @@ pub async fn get_service_price_preview(
     variant_id: Option<i64>,
     quantity: f64,
 ) -> ApiResult<ServicePricePreview> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     // Get service details
     let service = sqlx::query_as::<_, Service>("SELECT * FROM services WHERE id = ? AND is_active = 1")

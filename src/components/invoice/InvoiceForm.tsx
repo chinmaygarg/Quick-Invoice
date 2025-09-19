@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useApp } from '@/contexts/AppContext';
@@ -120,7 +120,7 @@ export function InvoiceForm() {
     }
   };
 
-  const validateForm = () => {
+  const validateForm = useCallback(() => {
     const errors: Record<string, string> = {};
 
     if (!formData.customerId) {
@@ -151,9 +151,9 @@ export function InvoiceForm() {
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
-  };
+  }, [formData.customerId, formData.items, formData.discount, formData.discountType]);
 
-  const calculateTotals = () => {
+  const calculateTotals = useMemo(() => {
     const subtotal = formData.items.reduce((sum, item) => {
       const itemTotal = item.amount + item.addons.reduce((addonSum, addon) => addonSum + addon.amount, 0);
       return sum + itemTotal;
@@ -191,11 +191,27 @@ export function InvoiceForm() {
       cgstAmount,
       total,
     };
-  };
+  }, [formData.items, formData.discount, formData.discountType, formData.expressCharge, formData.gstInclusive]);
 
-  const calculateTotal = () => {
-    return calculateTotals().total;
-  };
+  const calculateTotal = useMemo(() => {
+    return calculateTotals.total;
+  }, [calculateTotals]);
+
+  const isFormValid = useMemo(() => {
+    if (!formData.customerId) return false;
+    if (formData.items.length === 0) return false;
+
+    // Check each item
+    for (let i = 0; i < formData.items.length; i++) {
+      const item = formData.items[i];
+      if (item.quantity <= 0 || item.rate <= 0) return false;
+    }
+
+    if (formData.discount < 0) return false;
+    if (formData.discountType === 'percent' && formData.discount > 100) return false;
+
+    return true;
+  }, [formData.customerId, formData.items, formData.discount, formData.discountType]);
 
   const handleSubmit = async () => {
     if (!validateForm()) {
@@ -210,7 +226,7 @@ export function InvoiceForm() {
     try {
       setIsSubmitting(true);
 
-      const totals = calculateTotals();
+      const totals = calculateTotals;
 
       const invoiceData = {
         customer_id: formData.customerId,
@@ -287,8 +303,6 @@ export function InvoiceForm() {
     }));
   };
 
-  const totals = calculateTotals();
-
   const steps = [
     { id: 1, title: 'Customer & Store', component: 'customer' },
     { id: 2, title: 'Add Services', component: 'services' },
@@ -316,7 +330,7 @@ export function InvoiceForm() {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting || !validateForm()}
+            disabled={isSubmitting || !isFormValid}
             className="btn btn-primary btn-md"
             data-testid="generate-invoice"
           >
@@ -398,37 +412,22 @@ export function InvoiceForm() {
             />
           )}
 
-          {/* Summary and Payment Section */}
+          {/* Payment Section */}
           {currentStep === 3 && (
-            <div className="space-y-6">
-              <InvoiceSummary
-                items={formData.items}
-                discount={formData.discount}
-                discountType={formData.discountType}
-                onDiscountChange={(discount) => setFormData(prev => ({ ...prev, discount }))}
-                onDiscountTypeChange={(discountType) => setFormData(prev => ({ ...prev, discountType }))}
-                expressCharge={formData.expressCharge}
-                onExpressChargeChange={(expressCharge) => setFormData(prev => ({ ...prev, expressCharge }))}
-                gstInclusive={formData.gstInclusive}
-                onGstInclusiveChange={(gstInclusive) => setFormData(prev => ({ ...prev, gstInclusive }))}
-                error={validationErrors.summary}
-              />
-
-              <PaymentSection
-                totalAmount={calculateTotal()}
-                onPaymentUpdate={(payment) => setFormData(prev => ({
-                  ...prev,
-                  paymentMethod: payment.method,
-                  paymentAmount: payment.amount,
-                  notes: payment.notes
-                }))}
-                initialPayment={{
-                  method: formData.paymentMethod || 'cash',
-                  amount: formData.paymentAmount || calculateTotal(),
-                  notes: formData.notes
-                }}
-              />
-            </div>
+            <PaymentSection
+              totalAmount={calculateTotal}
+              onPaymentUpdate={(payment) => setFormData(prev => ({
+                ...prev,
+                paymentMethod: payment.method,
+                paymentAmount: payment.amount,
+                notes: payment.notes
+              }))}
+              initialPayment={{
+                method: formData.paymentMethod || 'cash',
+                amount: formData.paymentAmount || calculateTotal,
+                notes: formData.notes
+              }}
+            />
           )}
 
           {/* Navigation Buttons */}
@@ -454,9 +453,15 @@ export function InvoiceForm() {
         <div className="lg:col-span-1">
           <InvoiceSummary
             items={formData.items}
-            totals={totals}
+            discount={formData.discount}
+            discountType={formData.discountType}
+            onDiscountChange={(discount) => setFormData(prev => ({ ...prev, discount }))}
+            onDiscountTypeChange={(discountType) => setFormData(prev => ({ ...prev, discountType }))}
+            expressCharge={formData.expressCharge}
+            onExpressChargeChange={(expressCharge) => setFormData(prev => ({ ...prev, expressCharge }))}
             gstInclusive={formData.gstInclusive}
-            customerName={formData.customerId ? 'Selected Customer' : 'No Customer Selected'}
+            onGstInclusiveChange={(gstInclusive) => setFormData(prev => ({ ...prev, gstInclusive }))}
+            onAddService={handleAddService}
           />
         </div>
       </div>

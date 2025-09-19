@@ -2,7 +2,7 @@ use crate::database::DatabaseManager;
 use crate::models::{
     Service, CreateServiceRequest, UpdateServiceRequest, ServiceWithDetails,
     ServiceVariant, CreateServiceVariantRequest, ServiceAddon, CreateServiceAddonRequest,
-    ApiResult, ApiError
+    ServiceCategory, ApiResult, ApiError
 };
 use sqlx::Row;
 use tauri::State;
@@ -12,10 +12,7 @@ pub async fn create_service(
     state: State<'_, crate::AppState>,
     request: CreateServiceRequest,
 ) -> ApiResult<Service> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     // Validate input
     if request.name.trim().is_empty() {
@@ -130,10 +127,7 @@ pub async fn get_service_by_id(
     state: State<'_, crate::AppState>,
     service_id: i64,
 ) -> ApiResult<Service> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     let service = sqlx::query_as::<_, Service>("SELECT * FROM services WHERE id = ?")
         .bind(service_id)
@@ -159,10 +153,7 @@ pub async fn search_services(
     limit: Option<i64>,
     offset: Option<i64>,
 ) -> ApiResult<Vec<ServiceWithDetails>> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     let limit = limit.unwrap_or(50);
     let offset = offset.unwrap_or(0);
@@ -170,11 +161,12 @@ pub async fn search_services(
 
     let mut base_query = r#"
         SELECT
-            s.id, s.name, s.category, s.description, s.base_price, s.gst_rate,
+            s.id, s.name, COALESCE(sc.name, 'Uncategorized') as category, s.description, s.base_price, s.gst_rate,
             s.unit, s.min_quantity, s.is_active, s.created_at, s.updated_at,
             COALESCE(v.variants_count, 0) as variants_count,
             COALESCE(a.addons_count, 0) as addons_count
         FROM services s
+        LEFT JOIN service_categories sc ON s.category_id = sc.id
         LEFT JOIN (
             SELECT service_id, COUNT(*) as variants_count
             FROM service_variants
@@ -189,50 +181,156 @@ pub async fn search_services(
         ) a ON s.id = a.service_id
     "#.to_string();
 
-    let mut conditions = Vec::new();
-    let mut params: Vec<Box<dyn sqlx::Encode<sqlx::Sqlite> + Send + Sync>> = Vec::new();
+    // Build query based on filters
+    let active_filter = if include_inactive { "1=1" } else { "s.is_active = 1" };
 
-    if !include_inactive {
-        conditions.push("s.is_active = 1");
-    }
-
-    if let Some(search_query) = query {
+    let (query_str, services) = if let Some(search_query) = &query {
         if !search_query.trim().is_empty() {
-            conditions.push("(s.name LIKE ? OR s.description LIKE ?)");
-            let search_pattern = format!("%{}%", search_query.trim());
-            params.push(Box::new(search_pattern.clone()));
-            params.push(Box::new(search_pattern));
+            if let Some(cat) = &category {
+                if !cat.trim().is_empty() {
+                    // Both search and category
+                    let query_sql = format!("{} WHERE {} AND sc.name = ? AND (s.name LIKE ? OR s.description LIKE ?) ORDER BY s.name ASC LIMIT ? OFFSET ?", base_query, active_filter);
+                    let search_pattern = format!("%{}%", search_query.trim());
+                    let rows = sqlx::query(&query_sql)
+                        .bind(cat)
+                        .bind(&search_pattern)
+                        .bind(&search_pattern)
+                        .bind(limit)
+                        .bind(offset)
+                        .fetch_all(&pool)
+                        .await
+                        .map_err(|e| ApiError {
+                            message: format!("Failed to search services: {}", e),
+                            code: Some("DATABASE_ERROR".to_string()),
+                        })?;
+                    (query_sql, rows)
+                } else {
+                    // Search only
+                    let query_sql = format!("{} WHERE {} AND (s.name LIKE ? OR s.description LIKE ?) ORDER BY s.name ASC LIMIT ? OFFSET ?", base_query, active_filter);
+                    let search_pattern = format!("%{}%", search_query.trim());
+                    let rows = sqlx::query(&query_sql)
+                        .bind(&search_pattern)
+                        .bind(&search_pattern)
+                        .bind(limit)
+                        .bind(offset)
+                        .fetch_all(&pool)
+                        .await
+                        .map_err(|e| ApiError {
+                            message: format!("Failed to search services: {}", e),
+                            code: Some("DATABASE_ERROR".to_string()),
+                        })?;
+                    (query_sql, rows)
+                }
+            } else {
+                // Search only
+                let query_sql = format!("{} WHERE {} AND (s.name LIKE ? OR s.description LIKE ?) ORDER BY s.name ASC LIMIT ? OFFSET ?", base_query, active_filter);
+                let search_pattern = format!("%{}%", search_query.trim());
+                let rows = sqlx::query(&query_sql)
+                    .bind(&search_pattern)
+                    .bind(&search_pattern)
+                    .bind(limit)
+                    .bind(offset)
+                    .fetch_all(&pool)
+                    .await
+                    .map_err(|e| ApiError {
+                        message: format!("Failed to search services: {}", e),
+                        code: Some("DATABASE_ERROR".to_string()),
+                    })?;
+                (query_sql, rows)
+            }
+        } else {
+            // No search, maybe category
+            if let Some(cat) = &category {
+                if !cat.trim().is_empty() {
+                    let query_sql = format!("{} WHERE {} AND sc.name = ? ORDER BY s.name ASC LIMIT ? OFFSET ?", base_query, active_filter);
+                    let rows = sqlx::query(&query_sql)
+                        .bind(cat)
+                        .bind(limit)
+                        .bind(offset)
+                        .fetch_all(&pool)
+                        .await
+                        .map_err(|e| ApiError {
+                            message: format!("Failed to search services: {}", e),
+                            code: Some("DATABASE_ERROR".to_string()),
+                        })?;
+                    (query_sql, rows)
+                } else {
+                    // No filters
+                    let query_sql = format!("{} WHERE {} ORDER BY s.name ASC LIMIT ? OFFSET ?", base_query, active_filter);
+                    let rows = sqlx::query(&query_sql)
+                        .bind(limit)
+                        .bind(offset)
+                        .fetch_all(&pool)
+                        .await
+                        .map_err(|e| ApiError {
+                            message: format!("Failed to search services: {}", e),
+                            code: Some("DATABASE_ERROR".to_string()),
+                        })?;
+                    (query_sql, rows)
+                }
+            } else {
+                // No filters
+                let query_sql = format!("{} WHERE s.is_active = ? ORDER BY s.name ASC LIMIT ? OFFSET ?", base_query);
+                let rows = sqlx::query(&query_sql)
+                    .bind(1)
+                    .bind(limit)
+                    .bind(offset)
+                    .fetch_all(&pool)
+                    .await
+                    .map_err(|e| ApiError {
+                        message: format!("Failed to search services: {}", e),
+                        code: Some("DATABASE_ERROR".to_string()),
+                    })?;
+                (query_sql, rows)
+            }
         }
-    }
-
-    if let Some(cat) = category {
-        if !cat.trim().is_empty() {
-            conditions.push("s.category = ?");
-            params.push(Box::new(cat));
+    } else {
+        // No search query
+        if let Some(cat) = &category {
+            if !cat.trim().is_empty() {
+                let query_sql = format!("{} WHERE {} AND sc.name = ? ORDER BY s.name ASC LIMIT ? OFFSET ?", base_query, active_filter);
+                let rows = sqlx::query(&query_sql)
+                    .bind(cat)
+                    .bind(limit)
+                    .bind(offset)
+                    .fetch_all(&pool)
+                    .await
+                    .map_err(|e| ApiError {
+                        message: format!("Failed to search services: {}", e),
+                        code: Some("DATABASE_ERROR".to_string()),
+                    })?;
+                (query_sql, rows)
+            } else {
+                // No filters
+                let query_sql = format!("{} WHERE {} ORDER BY s.name ASC LIMIT ? OFFSET ?", base_query, active_filter);
+                let rows = sqlx::query(&query_sql)
+                    .bind(limit)
+                    .bind(offset)
+                    .fetch_all(&pool)
+                    .await
+                    .map_err(|e| ApiError {
+                        message: format!("Failed to search services: {}", e),
+                        code: Some("DATABASE_ERROR".to_string()),
+                    })?;
+                (query_sql, rows)
+            }
+        } else {
+            // No filters
+            let query_sql = format!("{} WHERE {} ORDER BY s.name ASC LIMIT ? OFFSET ?", base_query, active_filter);
+            let rows = sqlx::query(&query_sql)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(&pool)
+                .await
+                .map_err(|e| ApiError {
+                    message: format!("Failed to search services: {}", e),
+                    code: Some("DATABASE_ERROR".to_string()),
+                })?;
+            (query_sql, rows)
         }
-    }
+    };
 
-    if !conditions.is_empty() {
-        base_query.push_str(" WHERE ");
-        base_query.push_str(&conditions.join(" AND "));
-    }
-
-    base_query.push_str(" ORDER BY s.name ASC LIMIT ? OFFSET ?");
-    params.push(Box::new(limit));
-    params.push(Box::new(offset));
-
-    let mut query = sqlx::query(&base_query);
-    for param in params {
-        query = query.bind(param);
-    }
-
-    let rows = query
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| ApiError {
-            message: format!("Failed to search services: {}", e),
-            code: Some("DATABASE_ERROR".to_string()),
-        })?;
+    let rows = services;
 
     let services = rows.into_iter().map(|row| ServiceWithDetails {
         id: row.get("id"),
@@ -259,10 +357,7 @@ pub async fn update_service(
     service_id: i64,
     request: UpdateServiceRequest,
 ) -> ApiResult<Service> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     // Validate input
     if request.name.trim().is_empty() {
@@ -394,10 +489,7 @@ pub async fn update_service_status(
     service_id: i64,
     is_active: bool,
 ) -> ApiResult<String> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     let rows_affected = sqlx::query(
         "UPDATE services SET is_active = ?, updated_at = datetime('now') WHERE id = ?"
@@ -427,10 +519,7 @@ pub async fn get_service_variants(
     state: State<'_, crate::AppState>,
     service_id: i64,
 ) -> ApiResult<Vec<ServiceVariant>> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     let variants = sqlx::query_as::<_, ServiceVariant>(
         "SELECT * FROM service_variants WHERE service_id = ? ORDER BY name ASC"
@@ -451,10 +540,7 @@ pub async fn get_service_addons(
     state: State<'_, crate::AppState>,
     service_id: i64,
 ) -> ApiResult<Vec<ServiceAddon>> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     let addons = sqlx::query_as::<_, ServiceAddon>(
         "SELECT * FROM service_addons WHERE service_id = ? ORDER BY name ASC"
@@ -471,16 +557,54 @@ pub async fn get_service_addons(
 }
 
 #[tauri::command]
+pub async fn get_services_by_category(
+    state: State<'_, crate::AppState>,
+    category_id: i64,
+) -> ApiResult<Vec<Service>> {
+    let pool = state.db.get_pool_cloned();
+
+    let services = sqlx::query_as::<_, Service>(
+        "SELECT id, name, category, description, base_price, gst_rate, unit, min_quantity, is_active, created_at, updated_at
+         FROM services WHERE category_id = ? AND is_active = 1 ORDER BY name ASC"
+    )
+    .bind(category_id)
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| ApiError {
+        message: format!("Failed to get services by category: {}", e),
+        code: Some("DATABASE_ERROR".to_string()),
+    })?;
+
+    Ok(services)
+}
+
+#[tauri::command]
+pub async fn get_addons(
+    state: State<'_, crate::AppState>,
+) -> ApiResult<Vec<ServiceAddon>> {
+    let pool = state.db.get_pool_cloned();
+
+    let addons = sqlx::query_as::<_, ServiceAddon>(
+        "SELECT * FROM service_addons WHERE is_active = 1 ORDER BY name ASC"
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| ApiError {
+        message: format!("Failed to get service addons: {}", e),
+        code: Some("DATABASE_ERROR".to_string()),
+    })?;
+
+    Ok(addons)
+}
+
+#[tauri::command]
 pub async fn get_service_categories(
     state: State<'_, crate::AppState>,
-) -> ApiResult<Vec<String>> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+) -> ApiResult<Vec<ServiceCategory>> {
+    let pool = state.db.get_pool_cloned();
 
-    let categories: Vec<String> = sqlx::query_scalar(
-        "SELECT DISTINCT category FROM services WHERE category IS NOT NULL ORDER BY category ASC"
+    let categories = sqlx::query_as::<_, ServiceCategory>(
+        "SELECT id, name, parent_id, is_active, created_at FROM service_categories WHERE is_active = 1 ORDER BY name ASC"
     )
     .fetch_all(&pool)
     .await

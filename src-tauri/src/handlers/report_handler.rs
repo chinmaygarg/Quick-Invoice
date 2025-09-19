@@ -120,27 +120,24 @@ pub async fn get_sales_summary(
     state: State<'_, crate::AppState>,
     date_range: ReportDateRange,
 ) -> ApiResult<SalesSummary> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     // Basic sales metrics
     let sales_row = sqlx::query(
         r#"
         SELECT
             COUNT(*) as total_invoices,
-            COALESCE(SUM(total), 0) as total_revenue,
-            COALESCE(SUM(sgst_amount + cgst_amount + igst_amount), 0) as total_tax,
-            COALESCE(SUM(discount), 0) as total_discount,
-            COALESCE(AVG(total), 0) as average_invoice_value
+            CAST(COALESCE(SUM(total), 0.0) AS REAL) as total_revenue,
+            CAST(COALESCE(SUM(sgst_amount + cgst_amount + igst_amount), 0.0) AS REAL) as total_tax,
+            CAST(COALESCE(SUM(discount), 0.0) AS REAL) as total_discount,
+            CAST(COALESCE(AVG(total), 0.0) AS REAL) as average_invoice_value
         FROM invoices
         WHERE DATE(order_datetime) >= ? AND DATE(order_datetime) <= ?
         "#
     )
     .bind(&date_range.start_date)
     .bind(&date_range.end_date)
-    .fetch_one(pool)
+    .fetch_one(&pool)
     .await
     .map_err(|e| ApiError {
         message: format!("Database error: {}", e),
@@ -158,7 +155,7 @@ pub async fn get_sales_summary(
         r#"
         SELECT
             COALESCE(payment_method, 'unknown') as payment_method,
-            COALESCE(SUM(payment_amount), 0) as total_amount
+            CAST(COALESCE(SUM(payment_amount), 0.0) AS REAL) as total_amount
         FROM invoices
         WHERE DATE(order_datetime) >= ? AND DATE(order_datetime) <= ?
         GROUP BY payment_method
@@ -281,10 +278,7 @@ pub async fn get_gst_summary(
     state: State<'_, crate::AppState>,
     date_range: ReportDateRange,
 ) -> ApiResult<GstSummary> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     // Total GST summary
     let gst_total_row = sqlx::query(
@@ -300,7 +294,7 @@ pub async fn get_gst_summary(
     )
     .bind(&date_range.start_date)
     .bind(&date_range.end_date)
-    .fetch_one(pool)
+    .fetch_one(&pool)
     .await
     .map_err(|e| ApiError {
         message: format!("Database error: {}", e),
@@ -406,10 +400,7 @@ pub async fn get_customer_summary(
     state: State<'_, crate::AppState>,
     customer_id: i64,
 ) -> ApiResult<CustomerSummary> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     // Get customer basic info
     let customer_row = sqlx::query(
@@ -445,7 +436,7 @@ pub async fn get_customer_summary(
         "#
     )
     .bind(customer_id)
-    .fetch_one(pool)
+    .fetch_one(&pool)
     .await
     .map_err(|e| ApiError {
         message: format!("Database error: {}", e),
@@ -536,10 +527,7 @@ pub async fn get_service_popularity(
     state: State<'_, crate::AppState>,
     date_range: ReportDateRange,
 ) -> ApiResult<Vec<ServicePopularity>> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     let service_rows = sqlx::query(
         r#"
@@ -589,10 +577,7 @@ pub async fn get_express_delivery_summary(
     state: State<'_, crate::AppState>,
     date_range: ReportDateRange,
 ) -> ApiResult<serde_json::Value> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     let express_row = sqlx::query(
         r#"
@@ -610,7 +595,7 @@ pub async fn get_express_delivery_summary(
     .bind(&date_range.end_date)
     .bind(&date_range.start_date)
     .bind(&date_range.end_date)
-    .fetch_one(pool)
+    .fetch_one(&pool)
     .await
     .map_err(|e| ApiError {
         message: format!("Database error: {}", e),

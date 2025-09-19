@@ -28,12 +28,31 @@ interface InvoiceTotals {
 
 interface InvoiceSummaryProps {
   items: InvoiceItem[];
-  totals: InvoiceTotals;
+  discount: number;
+  discountType: 'flat' | 'percent';
+  onDiscountChange: (discount: number) => void;
+  onDiscountTypeChange: (discountType: 'flat' | 'percent') => void;
+  expressCharge: number;
+  onExpressChargeChange: (expressCharge: number) => void;
   gstInclusive: boolean;
-  customerName: string;
+  onGstInclusiveChange: (gstInclusive: boolean) => void;
+  onAddService?: (item: Omit<InvoiceItem, 'id'>) => void;
+  error?: string;
 }
 
-export function InvoiceSummary({ items, totals, gstInclusive, customerName }: InvoiceSummaryProps) {
+export function InvoiceSummary({
+  items,
+  discount,
+  discountType,
+  onDiscountChange,
+  onDiscountTypeChange,
+  expressCharge,
+  onExpressChargeChange,
+  gstInclusive,
+  onGstInclusiveChange,
+  onAddService,
+  error
+}: InvoiceSummaryProps) {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -41,6 +60,61 @@ export function InvoiceSummary({ items, totals, gstInclusive, customerName }: In
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount);
+  };
+
+  // Calculate totals
+  const subtotal = items.reduce((sum, item) => {
+    const itemTotal = item.amount + item.addons.reduce((addonSum, addon) => addonSum + addon.amount, 0);
+    return sum + itemTotal;
+  }, 0);
+
+  const discountAmount = discountType === 'percent'
+    ? (subtotal * discount) / 100
+    : discount;
+
+  const baseAmount = subtotal - discountAmount + expressCharge;
+
+  // GST calculation (18% = 9% SGST + 9% CGST)
+  const gstRate = 18;
+  let sgstAmount, cgstAmount, total;
+
+  if (gstInclusive) {
+    // When GST inclusive, extract GST from base amount
+    const gstTotal = (baseAmount * gstRate) / (100 + gstRate);
+    sgstAmount = gstTotal / 2;
+    cgstAmount = gstTotal / 2;
+    total = baseAmount;
+  } else {
+    // When GST exclusive, add GST to base amount
+    sgstAmount = (baseAmount * (gstRate / 2)) / 100;
+    cgstAmount = (baseAmount * (gstRate / 2)) / 100;
+    total = baseAmount + sgstAmount + cgstAmount;
+  }
+
+  const totals = {
+    subtotal,
+    discountAmount,
+    baseAmount,
+    sgstAmount,
+    cgstAmount,
+    total
+  };
+
+  // Quick Action handlers
+  const handleQuickAction = (serviceName: string, serviceId: number, quantity: number, rate: number, unit: string = 'kg') => {
+    if (!onAddService) return;
+
+    const quickService: Omit<InvoiceItem, 'id'> = {
+      serviceId,
+      serviceName,
+      quantity,
+      rate,
+      amount: quantity * rate,
+      gstRate: 18,
+      addons: []
+    };
+
+    onAddService(quickService);
   };
 
   return (
@@ -53,11 +127,12 @@ export function InvoiceSummary({ items, totals, gstInclusive, customerName }: In
       </div>
 
       <div className="card-body space-y-4">
-        {/* Customer Info */}
-        <div className="pb-4 border-b border-gray-200">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Customer</h4>
-          <p className="text-sm text-gray-900">{customerName}</p>
-        </div>
+        {/* Error Message */}
+        {error && (
+          <div className="bg-error-50 border border-error-200 rounded-lg p-3">
+            <p className="text-sm text-error-700">{error}</p>
+          </div>
+        )}
 
         {/* Items List */}
         <div>
@@ -149,13 +224,66 @@ export function InvoiceSummary({ items, totals, gstInclusive, customerName }: In
           </div>
         )}
 
-        {/* GST Mode Indicator */}
+        {/* Discount Controls */}
+        <div className="pt-4 border-t border-gray-200 space-y-3">
+          <h4 className="text-sm font-medium text-gray-700">Discount</h4>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <input
+                type="number"
+                value={discount}
+                onChange={(e) => onDiscountChange(Number(e.target.value))}
+                placeholder="0"
+                min="0"
+                className="form-input text-sm"
+                data-testid="discount-amount"
+              />
+            </div>
+            <div>
+              <select
+                value={discountType}
+                onChange={(e) => onDiscountTypeChange(e.target.value as 'flat' | 'percent')}
+                className="form-input text-sm"
+                data-testid="discount-type"
+              >
+                <option value="flat">Flat Amount</option>
+                <option value="percent">Percentage</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Express Delivery Controls */}
+        <div className="pt-4 border-t border-gray-200 space-y-3">
+          <h4 className="text-sm font-medium text-gray-700">Express Delivery</h4>
+          <div>
+            <input
+              type="number"
+              value={expressCharge}
+              onChange={(e) => onExpressChargeChange(Number(e.target.value))}
+              placeholder="0"
+              min="0"
+              className="form-input text-sm"
+              data-testid="express-charge"
+            />
+          </div>
+        </div>
+
+        {/* GST Mode Toggle */}
         <div className="pt-4 border-t border-gray-200">
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">GST Mode:</span>
-            <span className="text-sm font-medium" data-testid="gst-mode">
+            <button
+              onClick={() => onGstInclusiveChange(!gstInclusive)}
+              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+                gstInclusive
+                  ? 'bg-primary-100 text-primary-700 hover:bg-primary-200'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+              data-testid="gst-mode-toggle"
+            >
               {gstInclusive ? 'GST Inclusive' : 'GST Exclusive'}
-            </span>
+            </button>
           </div>
         </div>
 
@@ -164,40 +292,29 @@ export function InvoiceSummary({ items, totals, gstInclusive, customerName }: In
           <h4 className="text-sm font-medium text-gray-700 mb-3">Quick Actions</h4>
           <div className="space-y-2">
             <button
+              onClick={() => handleQuickAction('Wash & Fold', 2, 5, 89)}
               className="w-full btn btn-secondary btn-sm"
               data-testid="quick-service-wash-fold"
             >
-              + Wash & Fold (5kg)
+              + Wash & Fold (5kg) - ₹445
             </button>
             <button
+              onClick={() => handleQuickAction('Shirt', 30, 1, 49, 'piece')}
               className="w-full btn btn-secondary btn-sm"
               data-testid="quick-service-shirt"
             >
-              + Shirt Dry Clean
+              + Shirt Dry Clean - ₹49
             </button>
             <button
+              onClick={() => handleQuickAction('Saree', 53, 1, 159, 'piece')}
               className="w-full btn btn-secondary btn-sm"
               data-testid="quick-service-saree"
             >
-              + Saree Clean
+              + Saree Clean - ₹159
             </button>
           </div>
         </div>
 
-        {/* Express Delivery Option */}
-        <div className="pt-4 border-t border-gray-200">
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-              data-testid="express-delivery-toggle"
-            />
-            <span className="text-sm text-gray-700">Express Delivery (+50%)</span>
-          </label>
-          <p className="text-xs text-gray-500 mt-1">
-            Express delivery charges 50% extra
-          </p>
-        </div>
       </div>
     </div>
   );

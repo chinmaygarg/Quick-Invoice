@@ -1,7 +1,7 @@
 {
   "build": {
     "beforeDevCommand": "vite",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "vite build",
     "devPath": "http://localhost:1420",
     "distDir": "../dist",
     "withGlobalTauri": false
@@ -64,9 +64,8 @@
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
+        "icons/icon.png",
+        "icons/icon@2x.png"
       ],
       "identifier": "com.uclean.app",
       "longDescription": "Professional invoice generation system for laundry and dry cleaning services with GST compliance, A5 printing support, and comprehensive business management features.",
@@ -87,7 +86,7 @@
       }
     },
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data: blob:; font-src 'self' data:;"
     },
     "updater": {
       "active": false

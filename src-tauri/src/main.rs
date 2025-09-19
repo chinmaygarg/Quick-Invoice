@@ -1,8 +1,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::sync::{Arc, Mutex};
-use tauri::State;
+use std::sync::Arc;
+use tauri::{State, Manager};
 
 mod database;
 mod models;
@@ -23,19 +23,38 @@ use handlers::{
 
 // Application state
 struct AppState {
-    db: Arc<Mutex<DatabaseManager>>,
+    db: Arc<DatabaseManager>,
 }
 
 #[tokio::main]
 async fn main() {
     env_logger::init();
 
-    // Initialize database
-    let db_manager = DatabaseManager::new().await.expect("Failed to initialize database");
-
     tauri::Builder::default()
-        .manage(AppState {
-            db: Arc::new(Mutex::new(db_manager)),
+        .setup(|app| {
+            // Initialize database with app handle
+            let app_handle = app.handle();
+            tauri::async_runtime::spawn(async move {
+                match DatabaseManager::new(&app_handle).await {
+                    Ok(db_manager) => {
+                        app_handle.manage(AppState {
+                            db: Arc::new(db_manager),
+                        });
+
+                        // Initialize schema on first run
+                        if let Some(state) = app_handle.try_state::<AppState>() {
+                            if let Err(e) = state.db.initialize_schema().await {
+                                log::error!("Failed to initialize database schema: {}", e);
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        log::error!("Failed to initialize database: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            });
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             // Customer operations
@@ -65,6 +84,8 @@ async fn main() {
             service_handler::get_service_variants,
             service_handler::get_service_addons,
             service_handler::get_service_categories,
+            service_handler::get_services_by_category,
+            service_handler::get_addons,
 
             // Invoice operations
             invoice_handler::create_invoice,
@@ -108,19 +129,15 @@ async fn main() {
 
 #[tauri::command]
 async fn initialize_database(state: State<'_, AppState>) -> Result<String, String> {
-    let db_arc = state.db.clone();
-    let db_manager = {
-        let db = db_arc.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     // Execute initialization directly on the pool
     let schema = include_str!("database/schema.sql");
-    match sqlx::query(schema).execute(&db_manager).await {
+    match sqlx::query(schema).execute(&pool).await {
         Ok(_) => {
             // Execute seed data
             let seed_sql = include_str!("database/seed.sql");
-            match sqlx::query(seed_sql).execute(&db_manager).await {
+            match sqlx::query(seed_sql).execute(&pool).await {
                 Ok(_) => Ok("Database initialized successfully".to_string()),
                 Err(e) => Err(format!("Failed to seed database: {}", e)),
             }
@@ -131,45 +148,24 @@ async fn initialize_database(state: State<'_, AppState>) -> Result<String, Strin
 
 #[tauri::command]
 async fn backup_database(
+    app_handle: tauri::AppHandle,
     state: State<'_, AppState>,
     backup_path: String,
 ) -> Result<String, String> {
-    use tokio::fs;
-    use std::path::Path;
-
-    // Simple backup by copying the database file
-    let source_path = "database.sqlite";
-
-    if Path::new(source_path).exists() {
-        match fs::copy(source_path, &backup_path).await {
-            Ok(_) => Ok("Database backed up successfully".to_string()),
-            Err(e) => Err(format!("Failed to copy database file: {}", e)),
-        }
-    } else {
-        Err("Database file not found".to_string())
+    match state.db.backup_to_file(&app_handle, &backup_path).await {
+        Ok(_) => Ok("Database backed up successfully".to_string()),
+        Err(e) => Err(format!("Failed to backup database: {}", e)),
     }
 }
 
 #[tauri::command]
 async fn restore_database(
+    app_handle: tauri::AppHandle,
     state: State<'_, AppState>,
     backup_path: String,
 ) -> Result<String, String> {
-    use tokio::fs;
-
-    // Close current connections first
-    let db_arc = state.db.clone();
-    let close_result = {
-        let db = db_arc.lock().unwrap();
-        let pool_clone = db.get_pool_cloned();
-        drop(db); // Drop the lock before awaiting
-        pool_clone.close().await;
-        Ok(())
-    };
-
-    let target_path = "database.sqlite";
-    match fs::copy(&backup_path, target_path).await {
+    match state.db.restore_from_file(&app_handle, &backup_path).await {
         Ok(_) => Ok("Database restored successfully".to_string()),
-        Err(e) => Err(format!("Failed to restore database file: {}", e)),
+        Err(e) => Err(format!("Failed to restore database: {}", e)),
     }
 }

@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS customers (
 -- 2. Stores table
 CREATE TABLE IF NOT EXISTS stores (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT,
     name TEXT NOT NULL,
     address TEXT NOT NULL,
     city TEXT,
@@ -49,11 +50,14 @@ CREATE TABLE IF NOT EXISTS services (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     category TEXT,
+    category_id INTEGER REFERENCES service_categories(id),
     description TEXT,
     base_price REAL NOT NULL,
     gst_rate REAL DEFAULT 18.0,
     unit TEXT NOT NULL, -- kg, piece, set, sqft, pair, stain
     min_quantity INTEGER DEFAULT 1, -- minimum quantity (e.g., 5kg rule)
+    hsn_sac_code TEXT,
+    is_dynamic INTEGER DEFAULT 0,
     is_active INTEGER DEFAULT 1,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -110,6 +114,10 @@ CREATE TABLE IF NOT EXISTS invoices (
     -- GST settings
     gst_inclusive INTEGER DEFAULT 0, -- 0=Exclusive, 1=Inclusive
 
+    -- Payment tracking
+    payment_method TEXT, -- cash, card, upi, bank_transfer, credit, partial
+    payment_amount REAL DEFAULT 0,
+
     -- Status and tracking
     status TEXT DEFAULT 'pending', -- pending, in-progress, completed, paid, cancelled
     notes TEXT,
@@ -141,7 +149,7 @@ CREATE TABLE IF NOT EXISTS invoice_items (
 CREATE TABLE IF NOT EXISTS invoice_item_addons (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     invoice_item_id INTEGER NOT NULL REFERENCES invoice_items(id),
-    addon_id INTEGER NOT NULL REFERENCES addons(id),
+    addon_id INTEGER NOT NULL REFERENCES service_addons(id),
     qty REAL DEFAULT 1,
     rate REAL NOT NULL,
     amount REAL NOT NULL,
@@ -197,7 +205,7 @@ CREATE INDEX IF NOT EXISTS idx_invoice_items_service_id ON invoice_items(service
 CREATE INDEX IF NOT EXISTS idx_payments_invoice_id ON payments(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_payments_paid_on ON payments(paid_on);
 
-CREATE INDEX IF NOT EXISTS idx_services_category_id ON services(category_id);
+CREATE INDEX IF NOT EXISTS idx_services_category ON services(category);
 CREATE INDEX IF NOT EXISTS idx_services_active ON services(is_active);
 
 CREATE INDEX IF NOT EXISTS idx_service_variants_service_id ON service_variants(service_id);

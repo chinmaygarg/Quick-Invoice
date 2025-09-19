@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useApp } from '@/contexts/AppContext';
@@ -19,21 +19,41 @@ export function CustomerList() {
   const { showNotification, setLoading } = useApp();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'total_spent' | 'last_order_date'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedCustomers, setSelectedCustomers] = useState<number[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+  // Ref for search input to maintain focus
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Debounce search query to avoid triggering API calls on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 700);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   useEffect(() => {
     loadCustomers();
-  }, [searchQuery, sortBy, sortOrder]);
+  }, [debouncedSearchQuery, sortBy, sortOrder]);
 
   const loadCustomers = async () => {
     try {
-      setIsLoading(true);
+      // Use isSearching for search operations, isLoading only for initial page load
+      if (debouncedSearchQuery) {
+        setIsSearching(true);
+      } else {
+        setIsLoading(true);
+      }
+
       const result = await invoke('search_customers', {
-        query: searchQuery,
+        query: debouncedSearchQuery,
         sortBy,
         sortOrder,
         limit: 100,
@@ -48,6 +68,7 @@ export function CustomerList() {
       });
     } finally {
       setIsLoading(false);
+      setIsSearching(false);
     }
   };
 
@@ -183,18 +204,24 @@ export function CustomerList() {
             </label>
             <div className="relative">
               <input
+                ref={searchInputRef}
                 id="customer-search"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by name, phone, or email..."
-                className="form-input pl-10"
+                className="form-input pl-10 pr-10"
                 data-testid="customer-search"
               />
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
+              </div>
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                {isSearching ? (
+                  <div className="spinner w-4 h-4" />
+                ) : null}
               </div>
             </div>
           </div>

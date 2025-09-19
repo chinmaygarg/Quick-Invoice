@@ -418,6 +418,44 @@ impl PricingEngine {
 
         Ok(())
     }
+
+    /// Simple service pricing calculation for invoice creation
+    pub fn calculate_simple_pricing(
+        rate: f64,
+        quantity: f64,
+        _weight_kg: Option<f64>,  // Currently unused
+        _area_sqft: Option<f64>,  // Currently unused
+        gst_rate: f64,
+        gst_inclusive: bool,
+    ) -> ApiResult<SimplePricing> {
+        if quantity <= 0.0 {
+            return Err(ApiError {
+                message: "Quantity must be greater than 0".to_string(),
+                code: Some("INVALID_QUANTITY".to_string()),
+            });
+        }
+
+        let subtotal = rate * quantity;
+        let gst_calc = Self::calculate_gst(subtotal, gst_rate, gst_inclusive)?;
+
+        Ok(SimplePricing {
+            subtotal: gst_calc.base_amount,
+            line_total: subtotal,
+            sgst_amount: gst_calc.sgst_amount,
+            cgst_amount: gst_calc.cgst_amount,
+            total_with_gst: gst_calc.total_with_gst,
+        })
+    }
+}
+
+/// Simple pricing result for invoice items
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SimplePricing {
+    pub subtotal: f64,
+    pub line_total: f64,
+    pub sgst_amount: f64,
+    pub cgst_amount: f64,
+    pub total_with_gst: f64,
 }
 
 #[cfg(test)]

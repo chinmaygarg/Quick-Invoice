@@ -18,24 +18,24 @@ INSERT OR IGNORE INTO service_categories (id, name, parent_id) VALUES
 (9, 'Carpet & Sofa Cleaning', NULL);
 
 -- Insert laundry services
-INSERT OR IGNORE INTO services (id, category_id, name, unit, base_price, min_qty, gst_rate, hsn_sac_code) VALUES
-(1, 1, 'Wash & Fold', 'kg', 59, 5, 18, '999711'),
-(2, 1, 'Wash & Iron', 'kg', 89, 5, 18, '999711'),
-(3, 1, 'Steam Iron', 'piece', 10, 5, 18, '999711'),
-(4, 2, 'Premium Laundry', 'kg', 159, 0, 18, '999711');
+INSERT OR IGNORE INTO services (id, category_id, name, unit, base_price, min_quantity, gst_rate) VALUES
+(1, 1, 'Wash & Fold', 'kg', 59, 5, 18),
+(2, 1, 'Wash & Iron', 'kg', 89, 5, 18),
+(3, 1, 'Steam Iron', 'piece', 10, 5, 18),
+(4, 2, 'Premium Laundry', 'kg', 159, 0, 18);
 
 -- Insert laundry add-ons
-INSERT OR IGNORE INTO addons (id, name, unit, price, gst_rate) VALUES
-(1, 'Moth Proofing', 'kg', 20, 18),
-(2, 'Antiseptic', 'kg', 10, 18),
-(3, 'Stain Removal', 'stain', 30, 18),
-(4, 'Starch', 'piece', 25, 18),
-(5, 'Softener', 'kg', 5, 18),
-(6, 'Extra Soiled', 'kg', 10, 18),
-(7, 'Shoe Laundry', 'pair', 149, 18),
-(8, 'Hanger Packing', 'piece', 30, 18),
-(9, 'Shirt Packing', 'piece', 15, 18),
-(10, 'Express Delivery', 'order', 0, 18); -- calculated as percentage
+INSERT OR IGNORE INTO service_addons (id, service_id, name, unit, price) VALUES
+(1, 1, 'Moth Proofing', 'kg', 20),
+(2, 1, 'Antiseptic', 'kg', 10),
+(3, 1, 'Stain Removal', 'stain', 30),
+(4, 1, 'Starch', 'piece', 25),
+(5, 1, 'Softener', 'kg', 5),
+(6, 1, 'Extra Soiled', 'kg', 10),
+(7, 1, 'Shoe Laundry', 'pair', 149),
+(8, 1, 'Hanger Packing', 'piece', 30),
+(9, 1, 'Shirt Packing', 'piece', 15),
+(10, 1, 'Express Delivery', 'order', 0); -- calculated as percentage
 
 -- Insert household items
 INSERT OR IGNORE INTO services (id, category_id, name, unit, base_price, gst_rate, hsn_sac_code) VALUES
@@ -76,20 +76,20 @@ INSERT OR IGNORE INTO services (id, category_id, name, unit, base_price, gst_rat
 
 -- Insert service variants for dynamic pricing
 -- Saree variants
-INSERT OR IGNORE INTO service_variants (id, service_id, variant_name, base_price, gst_rate) VALUES
-(1, 53, 'Cotton/Synthetic', 159, 18),
-(2, 53, 'Silk/Chiffon/Georgette', 239, 18),
-(3, 53, 'Embroidered/Heavy', 299, 18);
+INSERT OR IGNORE INTO service_variants (id, service_id, name, price_multiplier) VALUES
+(1, 53, 'Cotton/Synthetic', 1.0),
+(2, 53, 'Silk/Chiffon/Georgette', 1.5),
+(3, 53, 'Embroidered/Heavy', 1.88);
 
 -- Dress (Heavy) variants
-INSERT OR IGNORE INTO service_variants (id, service_id, variant_name, base_price, gst_rate) VALUES
-(4, 52, 'Cotton', 239, 18),
-(5, 52, 'Silk/Velvet', 299, 18);
+INSERT OR IGNORE INTO service_variants (id, service_id, name, price_multiplier) VALUES
+(4, 52, 'Cotton', 1.0),
+(5, 52, 'Silk/Velvet', 1.25);
 
 -- Lehenga variants
-INSERT OR IGNORE INTO service_variants (id, service_id, variant_name, base_price, gst_rate) VALUES
-(6, 54, 'Regular', 599, 18),
-(7, 54, 'Designer/Heavy', 799, 18);
+INSERT OR IGNORE INTO service_variants (id, service_id, name, price_multiplier) VALUES
+(6, 54, 'Regular', 1.0),
+(7, 54, 'Designer/Heavy', 1.33);
 
 -- Insert kids' dry cleaning services
 INSERT OR IGNORE INTO services (id, category_id, name, unit, base_price, gst_rate, hsn_sac_code) VALUES

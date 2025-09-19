@@ -1,6 +1,6 @@
 use crate::database::DatabaseManager;
 use crate::models::{Invoice, InvoiceItem, Customer, Store, ApiResult, ApiError};
-use crate::services::pricing_engine::PricingEngine;
+use crate::services::pricing_engine::{PricingEngine, SimplePricing};
 use sqlx::Row;
 use tauri::State;
 use serde::{Deserialize, Serialize};
@@ -78,10 +78,7 @@ pub async fn create_invoice(
     state: State<'_, crate::AppState>,
     request: CreateInvoiceRequest,
 ) -> ApiResult<InvoiceResponse> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     // Start transaction
     let mut tx = pool.begin().await.map_err(|e| ApiError {
@@ -158,18 +155,20 @@ pub async fn create_invoice(
             .map_err(|e| ApiError {
                 message: format!("Database error: {}", e),
                 code: Some("DATABASE_ERROR".to_string()),
-            })?
-            .map(|row| {
-                let multiplier: f64 = row.get("price_multiplier");
-                base_rate * multiplier
-            })
-            .unwrap_or(base_rate)
+            })?;
+
+            variant_row
+                .map(|row| {
+                    let multiplier: f64 = row.get("price_multiplier");
+                    base_rate * multiplier
+                })
+                .unwrap_or(base_rate)
         } else {
             base_rate
         };
 
         // Calculate item pricing
-        let pricing = PricingEngine::calculate_service_pricing(
+        let pricing = PricingEngine::calculate_simple_pricing(
             variant_rate,
             item_request.qty,
             item_request.weight_kg,
@@ -231,7 +230,7 @@ pub async fn create_invoice(
             let addon_rate: f64 = addon_row.get("price");
             let addon_gst_rate: f64 = addon_row.get("gst_rate");
 
-            let addon_pricing = PricingEngine::calculate_service_pricing(
+            let addon_pricing = PricingEngine::calculate_simple_pricing(
                 addon_rate,
                 addon_request.qty,
                 None,
@@ -310,10 +309,7 @@ pub async fn get_invoice_by_id(
     state: State<'_, crate::AppState>,
     invoice_id: i64,
 ) -> ApiResult<InvoiceResponse> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     // Get invoice
     let invoice = sqlx::query_as::<_, Invoice>("SELECT * FROM invoices WHERE id = ?")
@@ -422,7 +418,7 @@ pub async fn get_invoice_by_id(
             InvoiceAddonDetail {
                 addon_name: addon_row.get("addon_name"),
                 quantity: addon_row.get("qty"),
-                rate: addon_row.get("price"),
+                rate: addon_row.get("rate"),
                 amount: addon_row.get("amount"),
             }
         }).collect();
@@ -449,10 +445,7 @@ pub async fn search_invoices(
     state: State<'_, crate::AppState>,
     query: InvoiceSearchQuery,
 ) -> ApiResult<Vec<Invoice>> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     let mut sql = "SELECT * FROM invoices WHERE 1=1".to_string();
     let mut params = Vec::new();
@@ -523,10 +516,7 @@ pub async fn update_invoice(
     invoice_id: i64,
     update_data: serde_json::Value,
 ) -> ApiResult<Invoice> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     // For now, just update basic fields like status, payment info, notes
     let mut sql = "UPDATE invoices SET ".to_string();
@@ -600,10 +590,7 @@ pub async fn update_invoice_status(
     invoice_id: i64,
     status: String,
 ) -> ApiResult<Invoice> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     sqlx::query("UPDATE invoices SET status = ? WHERE id = ?")
         .bind(&status)
@@ -636,10 +623,7 @@ pub async fn delete_invoice(
     state: State<'_, crate::AppState>,
     invoice_id: i64,
 ) -> ApiResult<String> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     // Start transaction to delete invoice and all related data
     let mut tx = pool.begin().await.map_err(|e| ApiError {
@@ -705,7 +689,7 @@ async fn generate_invoice_number(pool: &sqlx::SqlitePool) -> ApiResult<String> {
         "SELECT invoice_no FROM invoices WHERE invoice_no LIKE ? ORDER BY invoice_no DESC LIMIT 1"
     )
     .bind(format!("INV{}{}__%", year, month))
-    .fetch_optional(&pool)
+    .fetch_optional(pool)
     .await
     .map_err(|e| ApiError {
         message: format!("Database error: {}", e),

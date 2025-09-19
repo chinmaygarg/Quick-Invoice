@@ -33,10 +33,24 @@ export default defineConfig(async () => ({
   },
 
   build: {
-    target: "esnext",
-    minify: "esbuild",
-    sourcemap: false,
+    // Tauri supports es2021
+    target: process.env.TAURI_PLATFORM == 'windows' ? 'chrome105' : 'safari13',
+    // don't minify for debug builds
+    minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
+    // produce sourcemaps for debug builds
+    sourcemap: !!process.env.TAURI_DEBUG,
+    // Set base to relative paths for proper asset loading in Tauri
+    rollupOptions: {
+      output: {
+        assetFileNames: 'assets/[name]-[hash][extname]',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+      },
+    },
   },
+
+  // Use relative base for Tauri apps
+  base: './',
 
   test: {
     globals: true,

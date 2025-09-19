@@ -124,10 +124,7 @@ async fn get_invoice_pdf_data(
     state: State<'_, crate::AppState>,
     invoice_id: i64,
 ) -> ApiResult<InvoicePdfData> {
-    let pool = {
-        let db = state.db.lock().unwrap();
-        db.get_pool_cloned()
-    };
+    let pool = state.db.get_pool_cloned();
 
     // Get invoice
     let invoice = sqlx::query_as::<_, Invoice>("SELECT * FROM invoices WHERE id = ?")
@@ -266,7 +263,7 @@ async fn get_invoice_pdf_data(
     Ok(InvoicePdfData {
         invoice,
         customer,
-        store,
+        store: store.clone(),
         items,
         totals,
         settings: PdfGenerator::get_a5_settings(&store), // Default settings

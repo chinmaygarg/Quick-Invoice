@@ -377,11 +377,11 @@ impl PdfGenerator {
     }}
 </style>
         "#,
-        paper_size = match settings.paper_size {
-            PaperSize::A4 => "A4",
-            PaperSize::A5 => "A5",
-            PaperSize::Thermal80mm => "80mm 200mm",
-            PaperSize::Custom { width_mm, height_mm } => &format!("{}mm {}mm", width_mm, height_mm),
+        paper_size = match &settings.paper_size {
+            PaperSize::A4 => "A4".to_string(),
+            PaperSize::A5 => "A5".to_string(),
+            PaperSize::Thermal80mm => "80mm 200mm".to_string(),
+            PaperSize::Custom { width_mm, height_mm } => format!("{}mm {}mm", width_mm, height_mm),
         },
         margin_top = layout.margin_top,
         margin_right = layout.margin_right,
@@ -738,7 +738,7 @@ impl PdfGenerator {
             "", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"
         ];
 
-        fn convert_hundreds(num: u64) -> String {
+        fn convert_hundreds(num: u64, ones: &[&str], tens: &[&str]) -> String {
             let mut result = String::new();
 
             if num >= 100 {
@@ -765,35 +765,35 @@ impl PdfGenerator {
 
         if rupees >= 10000000 {
             let crores = rupees / 10000000;
-            result.push_str(&format!("{} Crore ", convert_hundreds(crores)));
+            result.push_str(&format!("{} Crore ", convert_hundreds(crores, &ones, &tens)));
             let remainder = rupees % 10000000;
             if remainder > 0 {
                 if remainder >= 100000 {
                     let lakhs = remainder / 100000;
-                    result.push_str(&format!("{} Lakh ", convert_hundreds(lakhs)));
+                    result.push_str(&format!("{} Lakh ", convert_hundreds(lakhs, &ones, &tens)));
                     let remainder = remainder % 100000;
                     if remainder > 0 {
-                        result.push_str(&format!("{} ", convert_hundreds(remainder)));
+                        result.push_str(&format!("{} ", convert_hundreds(remainder, &ones, &tens)));
                     }
                 } else {
-                    result.push_str(&format!("{} ", convert_hundreds(remainder)));
+                    result.push_str(&format!("{} ", convert_hundreds(remainder, &ones, &tens)));
                 }
             }
         } else if rupees >= 100000 {
             let lakhs = rupees / 100000;
-            result.push_str(&format!("{} Lakh ", convert_hundreds(lakhs)));
+            result.push_str(&format!("{} Lakh ", convert_hundreds(lakhs, &ones, &tens)));
             let remainder = rupees % 100000;
             if remainder > 0 {
-                result.push_str(&format!("{} ", convert_hundreds(remainder)));
+                result.push_str(&format!("{} ", convert_hundreds(remainder, &ones, &tens)));
             }
         } else {
-            result.push_str(&format!("{} ", convert_hundreds(rupees)));
+            result.push_str(&format!("{} ", convert_hundreds(rupees, &ones, &tens)));
         }
 
         result.push_str("Rupees");
 
         if paise > 0 {
-            result.push_str(&format!(" and {} Paise", convert_hundreds(paise)));
+            result.push_str(&format!(" and {} Paise", convert_hundreds(paise, &ones, &tens)));
         }
 
         result.push_str(" Only");

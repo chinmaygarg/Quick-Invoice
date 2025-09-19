@@ -73,6 +73,105 @@ pub fn format_date_for_display(date: &DateTime<Utc>) -> String {
     date.format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
+// GST Calculation structures
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GSTResult {
+    pub base_amount: f64,
+    pub sgst: f64,
+    pub cgst: f64,
+    pub igst: f64,
+    pub total_gst: f64,
+    pub total_amount: f64,
+    pub is_interstate: bool,
+}
+
+// Enhanced GST calculation functions
+pub fn calculate_gst_exclusive(amount: f64, rate: f64, is_interstate: bool) -> Result<GSTResult, String> {
+    if amount < 0.0 {
+        return Err("Amount cannot be negative".to_string());
+    }
+
+    if rate < 0.0 || rate > 100.0 {
+        return Err("GST rate must be between 0 and 100".to_string());
+    }
+
+    let gst_amount = round_to_paisa(amount * rate / 100.0);
+
+    if is_interstate {
+        // IGST for interstate transactions
+        Ok(GSTResult {
+            base_amount: amount,
+            sgst: 0.0,
+            cgst: 0.0,
+            igst: gst_amount,
+            total_gst: gst_amount,
+            total_amount: amount + gst_amount,
+            is_interstate,
+        })
+    } else {
+        // SGST + CGST for intrastate transactions
+        let sgst = round_to_paisa(gst_amount / 2.0);
+        let cgst = gst_amount - sgst; // Ensure total adds up correctly
+
+        Ok(GSTResult {
+            base_amount: amount,
+            sgst,
+            cgst,
+            igst: 0.0,
+            total_gst: sgst + cgst,
+            total_amount: amount + sgst + cgst,
+            is_interstate,
+        })
+    }
+}
+
+pub fn calculate_gst_inclusive(total_amount: f64, rate: f64, is_interstate: bool) -> Result<GSTResult, String> {
+    if total_amount < 0.0 {
+        return Err("Amount cannot be negative".to_string());
+    }
+
+    if rate < 0.0 || rate > 100.0 {
+        return Err("GST rate must be between 0 and 100".to_string());
+    }
+
+    // Calculate base amount from inclusive total
+    let base_amount = round_to_paisa(total_amount * 100.0 / (100.0 + rate));
+    let gst_amount = total_amount - base_amount;
+
+    if is_interstate {
+        // IGST for interstate transactions
+        Ok(GSTResult {
+            base_amount,
+            sgst: 0.0,
+            cgst: 0.0,
+            igst: gst_amount,
+            total_gst: gst_amount,
+            total_amount,
+            is_interstate,
+        })
+    } else {
+        // SGST + CGST for intrastate transactions
+        let sgst = round_to_paisa(gst_amount / 2.0);
+        let cgst = gst_amount - sgst; // Ensure total adds up correctly
+
+        Ok(GSTResult {
+            base_amount,
+            sgst,
+            cgst,
+            igst: 0.0,
+            total_gst: sgst + cgst,
+            total_amount,
+            is_interstate,
+        })
+    }
+}
+
+// Round to Indian currency (paisa level)
+pub fn round_to_paisa(amount: f64) -> f64 {
+    (amount * 100.0).round() / 100.0
+}
+
+// Legacy functions for backward compatibility
 pub fn calculate_gst_amount(base_amount: f64, gst_rate: f64) -> f64 {
     base_amount * (gst_rate / 100.0)
 }
