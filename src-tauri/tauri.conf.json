@@ -62,10 +62,7 @@
       },
       "externalBin": [],
       "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/icon.png",
-        "icons/icon@2x.png"
+        "icons/icon.ico"
       ],
       "identifier": "com.uclean.app",
       "longDescription": "Professional invoice generation system for laundry and dry cleaning services with GST compliance, A5 printing support, and comprehensive business management features.",

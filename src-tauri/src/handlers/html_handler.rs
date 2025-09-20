@@ -75,14 +75,29 @@ pub async fn save_and_open_invoice_html(
         Err(e) => {
             log::warn!("shell::open failed: {}, trying system open command", e);
 
-            // Fallback to system open command on macOS
-            Command::new("open")
-                .arg(&file_path)
-                .spawn()
-                .map_err(|cmd_err| ApiError {
-                    message: format!("Failed to open HTML file. shell::open error: {}, open command error: {}", e, cmd_err),
-                    code: Some("BROWSER_OPEN_ERROR".to_string()),
-                })?;
+            #[cfg(target_os = "windows")]
+            {
+                Command::new("cmd")
+                    .arg("/C")
+                    .arg("start")
+                    .arg(&file_path)
+                    .spawn()
+                    .map_err(|cmd_err| ApiError {
+                        message: format!("Failed to open HTML file. shell::open error: {}, open command error: {}", e, cmd_err),
+                        code: Some("BROWSER_OPEN_ERROR".to_string()),
+                    })?;
+            }
+
+            #[cfg(target_os = "macos")]
+            {
+                Command::new("open")
+                    .arg(&file_path)
+                    .spawn()
+                    .map_err(|cmd_err| ApiError {
+                        message: format!("Failed to open HTML file. shell::open error: {}, open command error: {}", e, cmd_err),
+                        code: Some("BROWSER_OPEN_ERROR".to_string()),
+                    })?;
+            }
 
             log::info!("Successfully opened file with system open command: {}", file_path);
         }
@@ -162,14 +177,29 @@ pub async fn open_html_file(file_path: String, app_handle: AppHandle) -> ApiResu
         Err(e) => {
             log::warn!("shell::open failed: {}, trying system open command", e);
 
-            // Fallback to system open command on macOS
-            Command::new("open")
-                .arg(&file_path)
-                .spawn()
-                .map_err(|cmd_err| ApiError {
-                    message: format!("Failed to open HTML file. shell::open error: {}, open command error: {}", e, cmd_err),
-                    code: Some("FILE_OPEN_ERROR".to_string()),
-                })?;
+            #[cfg(target_os = "windows")]
+            {
+                Command::new("cmd")
+                    .arg("/C")
+                    .arg("start")
+                    .arg(&file_path)
+                    .spawn()
+                    .map_err(|cmd_err| ApiError {
+                        message: format!("Failed to open HTML file. shell::open error: {}, open command error: {}", e, cmd_err),
+                        code: Some("FILE_OPEN_ERROR".to_string()),
+                    })?;
+            }
+
+            #[cfg(target_os = "macos")]
+            {
+                Command::new("open")
+                    .arg(&file_path)
+                    .spawn()
+                    .map_err(|cmd_err| ApiError {
+                        message: format!("Failed to open HTML file. shell::open error: {}, open command error: {}", e, cmd_err),
+                        code: Some("FILE_OPEN_ERROR".to_string()),
+                    })?;
+            }
 
             log::info!("Successfully opened file with system open command: {}", file_path);
         }
