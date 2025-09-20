@@ -1,5 +1,7 @@
 pub mod pricing_engine;
-pub mod pdf_generator;
+pub mod html_generator;
+pub mod template_engine;
 
 pub use pricing_engine::*;
-pub use pdf_generator::*;
+pub use html_generator::*;
+pub use template_engine::*;

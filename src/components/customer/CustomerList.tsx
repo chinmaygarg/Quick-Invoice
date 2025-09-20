@@ -52,11 +52,12 @@ export function CustomerList() {
         setIsLoading(true);
       }
 
-      const result = await invoke('search_customers', {
+      const result = await invoke('get_customers_with_stats', {
         query: debouncedSearchQuery,
-        sortBy,
-        sortOrder,
+        sort_by: sortBy,
+        sort_order: sortOrder,
         limit: 100,
+        offset: 0,
       });
       setCustomers(Array.isArray(result) ? result : []);
     } catch (error) {
@@ -107,6 +108,10 @@ export function CustomerList() {
   };
 
   const formatCurrency = (amount: number) => {
+    // Handle null, undefined, or NaN values
+    if (amount == null || isNaN(amount)) {
+      return '₹0';
+    }
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
@@ -331,7 +336,7 @@ export function CustomerList() {
                     </td>
                     <td className="table-cell">
                       <div className="text-center">
-                        <div className="font-medium text-gray-900">{customer.total_orders}</div>
+                        <div className="font-medium text-gray-900">{customer.total_orders || 0}</div>
                         <div className="text-xs text-gray-500">orders</div>
                       </div>
                     </td>

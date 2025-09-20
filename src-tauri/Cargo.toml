@@ -26,6 +26,8 @@ log = "0.4"
 env_logger = "0.10"
 rust_decimal = { version = "1.32", features = ["serde-float"] }
 regex = "1.10"
+tera = "1.19"
+urlencoding = "2.1"
 
 [dev-dependencies]
 tempfile = "3.8"

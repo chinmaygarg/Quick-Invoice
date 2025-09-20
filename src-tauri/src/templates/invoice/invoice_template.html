@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UCLEAN Invoice - {{ invoice.invoice_no }}</title>
+    <link rel="stylesheet" href="../assets/invoice_styles.css">
+</head>
+<body>
+    <div class="invoice-container">
+        <!-- Header with Logo and Invoice Number -->
+        <header class="invoice-header">
+            <div class="logo-section">
+                <div class="logo">
+                    <div class="logo-text">
+                        <span class="u-letter">U</span>
+                        <span class="clean-text">CLEAN</span>
+                    </div>
+                    <div class="tagline">WE ❤ LAUNDRY</div>
+                    <div class="website">www.ucleanlaundry.com</div>
+                </div>
+            </div>
+            <div class="invoice-number">
+                <strong>Tax Invoice No. - {{ invoice.invoice_no }}</strong>
+            </div>
+        </header>
+
+        <!-- Customer and Store Details Section -->
+        <div class="details-section">
+            <div class="customer-details">
+                <h3>CUSTOMER DETAILS</h3>
+                <div class="detail-item">
+                    <span class="label">Name:</span>
+                    <span class="value">{{ customer.name }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Ph No.:</span>
+                    <span class="value">{{ customer.phone | default(value="") }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Address:</span>
+                    <span class="value">{{ customer.address | default(value="") }}</span>
+                </div>
+            </div>
+
+            <div class="store-details">
+                <h3>STORE DETAILS</h3>
+                <div class="detail-item">
+                    <span class="label">Code:</span>
+                    <span class="value">{{ store.code | default(value="UC001") }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Name:</span>
+                    <span class="value">{{ store.name }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">GSTIN:</span>
+                    <span class="value">{{ store.gstin | default(value="") }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Ph No.:</span>
+                    <span class="value">{{ store.phone | default(value="") }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Address:</span>
+                    <span class="value">{{ store.address | default(value="") }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Order Details Section -->
+        <div class="order-details-section">
+            <h3>ORDER DETAILS</h3>
+            <div class="order-info">
+                <div class="order-info-item">
+                    <div class="info-label">ORDER NO. - {{ invoice.order_no | default(value=invoice.invoice_no) }} (WALK-IN)</div>
+                    <div class="info-value">{{ invoice.order_datetime | date(format="%Y-%m-%d %H:%M:%S") }}</div>
+                </div>
+                <div class="order-info-item">
+                    <div class="info-label">PICKUP DONE DATE & TIME</div>
+                    <div class="info-value">{{ invoice.pickup_datetime | default(value="0000-00-00") }}</div>
+                </div>
+                <div class="order-info-item">
+                    <div class="info-label">DELIVERY DATE & TIME</div>
+                    <div class="info-value">{{ invoice.delivery_datetime | default(value="") }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="items-section">
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th class="col-sno">S.NO.</th>
+                        <th class="col-service">SERVICE</th>
+                        <th class="col-hsn">HSN/SAC</th>
+                        <th class="col-items">ITEMS</th>
+                        <th class="col-rate">RATE</th>
+                        <th class="col-qty">QTY.</th>
+                        <th class="col-weight">WT./KG</th>
+                        <th class="col-addons">ADDONS</th>
+                        <th class="col-amount">AMOUNT</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td class="col-sno">{{ loop.index }}.</td>
+                        <td class="col-service">{{ item.service_name }}</td>
+                        <td class="col-hsn">{{ item.hsn_code | default(value="999712") }}</td>
+                        <td class="col-items">
+                            <div class="item-list">
+                                {% if item.variant_name %}
+                                • {{ item.variant_name }}
+                                {% endif %}
+                                {% for addon in item.addons %}
+                                • {{ addon.addon_name }}
+                                {% endfor %}
+                            </div>
+                        </td>
+                        <td class="col-rate">{{ item.item.rate | round(precision=2) }}</td>
+                        <td class="col-qty">{{ item.item.qty }}</td>
+                        <td class="col-weight">{{ item.item.weight_kg | default(value="-") }}</td>
+                        <td class="col-addons">{{ item.item.area_sqft | default(value="0.00") }}</td>
+                        <td class="col-amount">{{ item.item.amount | round(precision=2) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Totals Section -->
+        <div class="totals-section">
+            <div class="totals-table">
+                <div class="total-row">
+                    <span class="total-label">Amount:</span>
+                    <span class="total-value">₹ {{ totals.subtotal | round(precision=2) }}</span>
+                </div>
+                <div class="total-row">
+                    <span class="total-label">Addon:</span>
+                    <span class="total-value">₹ {{ totals.addon_amount | default(value=0.00) | round(precision=2) }}</span>
+                </div>
+                <div class="total-row">
+                    <span class="total-label">Express Amount:</span>
+                    <span class="total-value">₹ {{ totals.express_charge | round(precision=2) }}</span>
+                </div>
+                <div class="total-row">
+                    <span class="total-label">Discount:</span>
+                    <span class="total-value">₹ {{ totals.discount_amount | round(precision=2) }}</span>
+                </div>
+                <div class="total-row">
+                    <span class="total-label">SGST:</span>
+                    <span class="total-value">{{ totals.sgst_amount | round(precision=2) }}</span>
+                </div>
+                <div class="total-row">
+                    <span class="total-label">CGST:</span>
+                    <span class="total-value">{{ totals.cgst_amount | round(precision=2) }}</span>
+                </div>
+                <div class="total-row final-total">
+                    <span class="total-label">TOTAL</span>
+                    <span class="total-value">₹ {{ totals.total_amount | round(precision=2) }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="invoice-footer">
+            <div class="footer-line">
+                <span class="website">www.ucleanlaundry.com</span>
+            </div>
+            <div class="footer-line">
+                <span class="disclaimer">Disclaimer: I hereby acknowledge that I accept the service terms & conditions*</span>
+            </div>
+            <div class="footer-line">
+                <span class="contact">Contact Support: {{ store.support_phone | default(value="9999759911") }} {{ store.support_email | default(value="support@uclean.in") }}</span>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

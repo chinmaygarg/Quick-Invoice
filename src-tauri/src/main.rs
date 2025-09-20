@@ -18,7 +18,7 @@ use handlers::{
     store_handler,
     report_handler,
     pricing_handler,
-    pdf_handler,
+    html_handler,
 };
 
 // Application state
@@ -93,6 +93,7 @@ async fn main() {
             invoice_handler::search_invoices,
             invoice_handler::update_invoice,
             invoice_handler::update_invoice_status,
+            invoice_handler::update_invoice_details,
             invoice_handler::delete_invoice,
 
             // Pricing operations
@@ -103,13 +104,15 @@ async fn main() {
             pricing_handler::get_service_price_preview,
             pricing_handler::validate_pricing_request_api,
 
-            // PDF operations
-            pdf_handler::generate_invoice_pdf_a5,
-            pdf_handler::generate_invoice_pdf_a4,
-            pdf_handler::generate_invoice_pdf_thermal,
-            pdf_handler::preview_invoice_html,
-            pdf_handler::convert_amount_to_words,
-            pdf_handler::validate_pdf_output_path,
+            // HTML operations
+            html_handler::save_invoice_html_a5,
+            html_handler::save_invoice_html_a4,
+            html_handler::save_invoice_html_thermal,
+            html_handler::save_and_open_invoice_html,
+            html_handler::preview_invoice_html,
+            html_handler::convert_amount_to_words,
+            html_handler::validate_html_output_path,
+            html_handler::open_html_file,
 
             // Report operations
             report_handler::get_sales_summary,

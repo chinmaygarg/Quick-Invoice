@@ -5,7 +5,9 @@ import { Button } from '../ui/button';
 import { DataTable } from '../common/DataTable';
 import { SearchBar } from '../common/SearchBar';
 import { Modal } from '../common/Modal';
+import { InvoiceHTMLPreview } from './InvoiceHTMLPreview';
 import { invoke } from '@tauri-apps/api/tauri';
+import { open } from '@tauri-apps/api/shell';
 import { toast } from 'react-hot-toast';
 
 interface Invoice {
@@ -14,7 +16,7 @@ interface Invoice {
   customer_id: number;
   store_id: number;
   order_datetime: string;
-  delivery_datetime: string;
+  delivery_datetime?: string;
   subtotal: number;
   discount: number;
   express_charge: number;
@@ -69,6 +71,15 @@ const PAYMENT_STATUS_COLORS = {
   credit: 'bg-blue-100 text-blue-800',
 };
 
+const PAYMENT_METHODS = [
+  { value: '', label: 'Select Payment Method' },
+  { value: 'cash', label: 'Cash' },
+  { value: 'card', label: 'Card' },
+  { value: 'upi', label: 'UPI' },
+  { value: 'bank_transfer', label: 'Bank Transfer' },
+  { value: 'credit', label: 'Credit' },
+];
+
 export const InvoiceList: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -83,7 +94,11 @@ export const InvoiceList: React.FC = () => {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showHTMLPreview, setShowHTMLPreview] = useState(false);
   const [newStatus, setNewStatus] = useState('');
+  const [newPaymentMethod, setNewPaymentMethod] = useState('');
+  const [newPaymentAmount, setNewPaymentAmount] = useState<number>(0);
+  const [newDeliveryDate, setNewDeliveryDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 20;
@@ -141,22 +156,50 @@ export const InvoiceList: React.FC = () => {
   };
 
   const handleStatusUpdate = async () => {
-    if (!selectedInvoice || !newStatus) return;
+    if (!selectedInvoice) return;
 
     try {
-      await invoke('update_invoice_status', {
+      // Build update request with only the fields that have changed
+      const updateRequest: any = {};
+
+      if (newStatus && newStatus !== selectedInvoice.status) {
+        updateRequest.status = newStatus;
+      }
+
+      if (newPaymentMethod && newPaymentMethod !== (selectedInvoice.payment_method || '')) {
+        updateRequest.payment_method = newPaymentMethod;
+      }
+
+      if (newPaymentAmount !== (selectedInvoice.payment_amount || 0)) {
+        updateRequest.payment_amount = newPaymentAmount;
+      }
+
+      if (newDeliveryDate && newDeliveryDate !== (selectedInvoice.delivery_datetime?.split('T')[0] || '')) {
+        updateRequest.delivery_datetime = newDeliveryDate ? `${newDeliveryDate}T19:00:00` : null;
+      }
+
+      // Only update if there are changes
+      if (Object.keys(updateRequest).length === 0) {
+        toast.error('No changes to update');
+        return;
+      }
+
+      await invoke('update_invoice_details', {
         invoiceId: selectedInvoice.id,
-        status: newStatus,
+        request: updateRequest,
       });
 
-      toast.success('Invoice status updated successfully');
+      toast.success('Invoice updated successfully');
       setShowStatusModal(false);
       setSelectedInvoice(null);
       setNewStatus('');
+      setNewPaymentMethod('');
+      setNewPaymentAmount(0);
+      setNewDeliveryDate('');
       loadInvoices();
     } catch (error) {
-      console.error('Failed to update status:', error);
-      toast.error('Failed to update invoice status');
+      console.error('Failed to update invoice:', error);
+      toast.error('Failed to update invoice');
     }
   };
 
@@ -175,15 +218,17 @@ export const InvoiceList: React.FC = () => {
     }
   };
 
-  const generatePDF = async (invoice: Invoice, format: 'a4' | 'a5' | 'thermal') => {
+  const generateInvoice = async (invoice: Invoice, format: 'a4' | 'a5' | 'thermal') => {
     try {
-      const result = await invoke<string>(`generate_invoice_pdf_${format}`, {
+      const filePath = await invoke<string>('save_and_open_invoice_html', {
         invoiceId: invoice.id,
+        format: format,
       });
-      toast.success(`PDF generated: ${result}`);
+
+      toast.success(`Invoice opened in browser for printing: ${filePath.split('/').pop()}`);
     } catch (error) {
-      console.error('Failed to generate PDF:', error);
-      toast.error('Failed to generate PDF');
+      console.error('Failed to generate invoice:', error);
+      toast.error('Failed to generate invoice');
     }
   };
 
@@ -304,6 +349,9 @@ export const InvoiceList: React.FC = () => {
             onClick={() => {
               setSelectedInvoice(invoice);
               setNewStatus(invoice.status);
+              setNewPaymentMethod(invoice.payment_method || '');
+              setNewPaymentAmount(invoice.payment_amount || 0);
+              setNewDeliveryDate(invoice.delivery_datetime?.split('T')[0] || '');
               setShowStatusModal(true);
             }}
             title="Update Status"
@@ -313,10 +361,21 @@ export const InvoiceList: React.FC = () => {
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => generatePDF(invoice, 'a5')}
-            title="Generate PDF"
+            onClick={() => generateInvoice(invoice, 'a5')}
+            title="Print Invoice"
           >
-            📄
+            🖨️
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setSelectedInvoice(invoice);
+              setShowHTMLPreview(true);
+            }}
+            title="View HTML"
+          >
+            👁️
           </Button>
           <Button
             size="sm"
@@ -468,16 +527,18 @@ export const InvoiceList: React.FC = () => {
       <Modal
         isOpen={showStatusModal}
         onClose={() => setShowStatusModal(false)}
-        title="Update Invoice Status"
+        title="Update Invoice Details"
       >
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Invoice: {selectedInvoice?.invoice_no}
+            <label className="block text-sm font-medium mb-3 text-gray-700">
+              Invoice: <span className="font-bold">{selectedInvoice?.invoice_no}</span>
             </label>
-            <label className="block text-sm font-medium mb-2">
-              New Status
-            </label>
+          </div>
+
+          {/* Order Status Section */}
+          <div className="border rounded-lg p-4 space-y-3">
+            <h3 className="text-md font-medium text-gray-800">Order Status</h3>
             <select
               value={newStatus}
               onChange={(e) => setNewStatus(e.target.value)}
@@ -491,7 +552,96 @@ export const InvoiceList: React.FC = () => {
             </select>
           </div>
 
-          <div className="flex justify-end space-x-2">
+          {/* Payment Details Section */}
+          <div className="border rounded-lg p-4 space-y-3">
+            <h3 className="text-md font-medium text-gray-800">Payment Details</h3>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-600">
+                  Payment Method
+                </label>
+                <select
+                  value={newPaymentMethod}
+                  onChange={(e) => setNewPaymentMethod(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {PAYMENT_METHODS.map((method) => (
+                    <option key={method.value} value={method.value}>
+                      {method.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-600">
+                  Payment Amount (₹)
+                </label>
+                <input
+                  type="number"
+                  value={newPaymentAmount}
+                  onChange={(e) => setNewPaymentAmount(Number(e.target.value))}
+                  min="0"
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Quick Payment Actions */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setNewPaymentAmount(selectedInvoice?.total || 0)}
+                className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-full hover:bg-green-200"
+              >
+                Mark as Fully Paid
+              </button>
+              <button
+                onClick={() => {
+                  setNewPaymentAmount(0);
+                  setNewPaymentMethod('');
+                }}
+                className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200"
+              >
+                Clear Payment
+              </button>
+            </div>
+          </div>
+
+          {/* Delivery Details Section */}
+          <div className="border rounded-lg p-4 space-y-3">
+            <h3 className="text-md font-medium text-gray-800">Delivery Details</h3>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-600">
+                  Delivery Date
+                </label>
+                <input
+                  type="date"
+                  value={newDeliveryDate}
+                  onChange={(e) => setNewDeliveryDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  onClick={() => {
+                    const today = new Date().toISOString().split('T')[0];
+                    setNewDeliveryDate(today);
+                    setNewStatus('delivered');
+                  }}
+                  className="px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
+                >
+                  Mark as Delivered Now
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-4 border-t">
             <Button
               onClick={() => setShowStatusModal(false)}
               variant="outline"
@@ -499,7 +649,7 @@ export const InvoiceList: React.FC = () => {
               Cancel
             </Button>
             <Button onClick={handleStatusUpdate}>
-              Update Status
+              Update Invoice
             </Button>
           </div>
         </div>
@@ -533,6 +683,19 @@ export const InvoiceList: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {/* HTML Preview Modal */}
+      {selectedInvoice && (
+        <InvoiceHTMLPreview
+          isOpen={showHTMLPreview}
+          onClose={() => {
+            setShowHTMLPreview(false);
+            setSelectedInvoice(null);
+          }}
+          invoiceId={selectedInvoice.id}
+          invoiceNo={selectedInvoice.invoice_no}
+        />
+      )}
     </div>
   );
 };

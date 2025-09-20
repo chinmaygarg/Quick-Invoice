@@ -129,7 +129,15 @@ pub async fn get_service_by_id(
 ) -> ApiResult<Service> {
     let pool = state.db.get_pool_cloned();
 
-    let service = sqlx::query_as::<_, Service>("SELECT * FROM services WHERE id = ?")
+    let service = sqlx::query_as::<_, Service>(
+        "SELECT
+            s.id, s.name, COALESCE(sc.name, 'Uncategorized') as category,
+            s.description, s.base_price, s.gst_rate, s.unit, s.min_quantity,
+            s.is_active, s.created_at, s.updated_at
+         FROM services s
+         LEFT JOIN service_categories sc ON s.category_id = sc.id
+         WHERE s.id = ?"
+    )
         .bind(service_id)
         .fetch_optional(&pool)
         .await

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='UTF-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1.0'>
+<title>Invoice</title>
+
+<style>
+    @page {
+        size: A5;
+        margin: 8mm 6mm 8mm 6mm;
+    }
+
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: 'Arial', sans-serif;
+        font-size: 9pt;
+        line-height: 1.2;
+        color: #333;
+        background: white;
+    }
+
+    .invoice-container {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 4mm;
+        border-bottom: 2px solid #2563eb;
+        padding-bottom: 5mm;
+    }
+
+    .business-info {
+        flex: 1;
+    }
+
+    .business-name {
+        font-size: 12pt;
+        font-weight: bold;
+        color: #2563eb;
+        margin-bottom: 2mm;
+    }
+
+    .business-tagline {
+        font-size: 7pt;
+        color: #64748b;
+        font-style: italic;
+    }
+
+    .invoice-info {
+        text-align: right;
+        flex: 1;
+    }
+
+    .invoice-title {
+        font-size: 12pt;
+        font-weight: bold;
+        color: #2563eb;
+        margin-bottom: 3mm;
+    }
+
+    .bill-to {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 4mm;
+    }
+
+    .customer-info, .store-info {
+        flex: 1;
+    }
+
+    .section-title {
+        font-size: 9pt;
+        font-weight: bold;
+        margin-bottom: 2mm;
+        color: #2563eb;
+    }
+
+    .items-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 4mm;
+        font-size: 7pt;
+    }
+
+    .items-table th,
+    .items-table td {
+        border: 1px solid #ddd;
+        padding: 2mm;
+        text-align: left;
+    }
+
+    .items-table th {
+        background-color: #2563eb;
+        color: white;
+        font-weight: bold;
+        font-size: 7pt;
+    }
+
+    .items-table .text-right {
+        text-align: right;
+    }
+
+    .items-table .text-center {
+        text-align: center;
+    }
+
+    .addon-row {
+        background-color: #f8f9fa;
+        font-style: italic;
+    }
+
+    .totals-section {
+        margin-top: 4mm;
+        border-top: 1px solid #ddd;
+        padding-top: 3mm;
+    }
+
+    .totals-table {
+        width: 50%;
+        margin-left: auto;
+        font-size: 9pt;
+    }
+
+    .totals-table td {
+        padding: 1mm 3mm;
+        border: none;
+    }
+
+    .total-row {
+        font-weight: bold;
+        font-size: 9pt;
+        border-top: 2px solid #2563eb;
+    }
+
+    .amount-words {
+        margin-top: 3mm;
+        font-style: italic;
+        color: #64748b;
+    }
+
+    .footer {
+        margin-top: 4mm;
+        border-top: 1px solid #ddd;
+        padding-top: 3mm;
+        font-size: 7pt;
+    }
+
+    .terms {
+        margin-bottom: 3mm;
+    }
+
+    .terms ol {
+        padding-left: 5mm;
+    }
+
+    .thank-you {
+        text-align: center;
+        font-weight: bold;
+        color: #2563eb;
+        margin: 3mm 0;
+    }
+
+    .contact-info {
+        text-align: center;
+        color: #64748b;
+    }
+
+    /* A5 specific optimizations */
+    @media print {
+        .invoice-container {
+            width: 148mm;
+            max-width: 148mm;
+        }
+
+        .items-table {
+            font-size: 7pt;
+        }
+
+        .items-table th,
+        .items-table td {
+            padding: 1mm;
+        }
+    }
+
+    /* Thermal printer optimizations */
+    .thermal {
+        width: 72mm;
+        font-size: 8pt;
+    }
+
+    .thermal .header {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .thermal .bill-to {
+        flex-direction: column;
+    }
+
+    .thermal .items-table {
+        font-size: 7pt;
+    }
+</style>
+        </head>
+<body>
+<div class='invoice-container'>
+
+<div class="header">
+    <div class="business-info">
+        <div class="business-name">UClean Massoorie Road</div>
+        <div class="business-tagline">Professional Laundry & Dry Cleaning Services</div>
+        <div style="margin-top: 3mm; font-size: 8pt;">
+            Mussoori Road, Near DIT UNIVERSITY, DEHRADUN, UTTARAKHAND - 248009<br>
+            ,  <br>
+            Phone: 9999759911<br>
+            Email: N/A<br>
+            GSTIN: 05BCFPJ0289J1ZK
+        </div>
+    </div>
+    <div class="invoice-info">
+        <div class="invoice-title">INVOICE</div>
+        <div><strong>Invoice No:</strong> INV2509__001</div>
+        <div><strong>Date:</strong> 2025-09-19</div>
+        <div><strong>Order Source:</strong> WALK-IN</div>
+        <div><strong>Delivery Date:</strong> 2025-09-21</div>
+    </div>
+</div>
+        
+<div class="bill-to">
+    <div class="customer-info">
+        <div class="section-title">Bill To:</div>
+        <div><strong>Astha</strong></div>
+        <div>Phone: 9990377731</div>
+        <div>Email: abc@123.com</div>
+        <div>Indirapuram</div>
+    </div>
+    <div class="store-info">
+        <div class="section-title">Bill From:</div>
+        <div><strong>UClean Massoorie Road</strong></div>
+        <div>Mussoori Road, Near DIT UNIVERSITY, DEHRADUN, UTTARAKHAND - 248009</div>
+    </div>
+</div>
+        
+<div style="margin-bottom: 8mm;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div><strong>Status:</strong> <span style="color: #28a745;">DELIVERED</span></div>
+        <div><strong>GST Mode:</strong> GST Exclusive</div>
+    </div>
+</div>
+        
+<table class="items-table">
+    <thead>
+        <tr>
+            <th style="width: 5%;">#</th>
+            <th style="width: 35%;">Description</th>
+            <th style="width: 10%;">Qty</th>
+            <th style="width: 15%;">Rate</th>
+            <th style="width: 15%;">Amount</th>
+            <th style="width: 10%;">GST%</th>
+            <th style="width: 10%;">GST Amt</th>
+        </tr>
+    </thead>
+    <tbody>
+        
+        <tr>
+            <td class="text-center">1</td>
+            <td>
+                <div><strong>Wash & Iron</strong></div>
+                
+                
+            </td>
+            <td class="text-center">5 kg</td>
+            <td class="text-right">₹89.00</td>
+            <td class="text-right">₹445.00</td>
+            <td class="text-center">18.0%</td>
+            <td class="text-right">₹80.10</td>
+        </tr>
+            
+    </tbody>
+</table>
+        <div class="totals-section"><table class="totals-table"><tr><td>Subtotal:</td><td class="text-right">₹445.00</td></tr><tr><td>SGST (9%):</td><td class="text-right">₹40.05</td></tr><tr><td>CGST (9%):</td><td class="text-right">₹40.05</td></tr><tr class="total-row"><td><strong>Total:</strong></td><td class="text-right"><strong>₹525.10</strong></td></tr></table><div class="amount-words"><strong>Amount in Words:</strong> Five Hundred Twenty Five Rupees and Ten Paise Only</div></div><div class="footer"><div class="terms"><div class="section-title">Terms & Conditions:</div><ol><li>Items will be ready within the specified time frame</li><li>Claims for damages or loss must be made within 7 days</li><li>We are not responsible for color bleeding or shrinkage</li><li>Payment due on delivery unless otherwise arranged</li></ol></div><div class="thank-you">Thank you for choosing our services!</div><div class="contact-info"><div>For any queries, please call us or visit our store</div><div>Follow us on social media for updates and offers</div></div></div></div>
+</body>
+</html>

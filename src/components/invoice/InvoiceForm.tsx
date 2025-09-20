@@ -236,18 +236,20 @@ export function InvoiceForm() {
         items: formData.items.map(item => ({
           service_id: item.serviceId,
           variant_id: item.variantId,
-          description: item.description,
+          description: item.description || null,
           qty: item.quantity,
           weight_kg: item.weight,
           addons: item.addons.length > 0 ? item.addons.map(addon => ({
             addon_id: addon.addonId,
             qty: addon.quantity,
-          })) : undefined,
+          })) : null,
         })),
         discount: formData.discount,
         discount_type: formData.discountType,
         express_charge: formData.expressCharge,
         gst_inclusive: formData.gstInclusive,
+        payment_method: formData.paymentMethod,
+        payment_amount: formData.paymentAmount,
         notes: formData.notes,
       };
 

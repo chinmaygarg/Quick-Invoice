@@ -283,18 +283,75 @@ pub async fn get_customers_with_stats(
     let limit = limit.unwrap_or(50);
     let offset = offset.unwrap_or(0);
 
-    // Simplified approach: get basic customers data first
-    let base_query = "SELECT * FROM customers ORDER BY name ASC LIMIT ? OFFSET ?";
+    // Use a more complex query with LEFT JOIN to calculate statistics
+    let mut base_query = r#"
+        SELECT
+            c.id,
+            c.name,
+            c.phone,
+            c.email,
+            c.address,
+            c.notes,
+            c.is_active,
+            c.created_at,
+            c.updated_at,
+            COALESCE(COUNT(i.id), 0) as total_orders,
+            COALESCE(SUM(i.total), 0.0) as total_spent,
+            MAX(i.order_datetime) as last_order_date
+        FROM customers c
+        LEFT JOIN invoices i ON c.id = i.customer_id
+    "#.to_string();
 
-    let rows = sqlx::query(base_query)
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(&pool)
-        .await
-        .map_err(|e| ApiError {
-            message: format!("Failed to fetch customers: {}", e),
-            code: Some("DATABASE_ERROR".to_string()),
-        })?;
+    // Add search filter if provided
+    if let Some(ref search_query) = query {
+        if !search_query.trim().is_empty() {
+            base_query.push_str(" WHERE (c.name LIKE ? OR c.phone LIKE ? OR c.email LIKE ?)");
+        }
+    }
+
+    base_query.push_str(" GROUP BY c.id, c.name, c.phone, c.email, c.address, c.notes, c.is_active, c.created_at, c.updated_at");
+
+    // Add sorting
+    let sort_field = sort_by.as_deref().unwrap_or("name");
+    let sort_direction = sort_order.as_deref().unwrap_or("asc");
+
+    match sort_field {
+        "total_spent" => base_query.push_str(&format!(" ORDER BY total_spent {}", sort_direction)),
+        "last_order_date" => base_query.push_str(&format!(" ORDER BY last_order_date {} NULLS LAST", sort_direction)),
+        _ => base_query.push_str(&format!(" ORDER BY c.name {}", sort_direction)),
+    }
+
+    base_query.push_str(" LIMIT ? OFFSET ?");
+
+    let rows = if let Some(ref search_query) = query {
+        if !search_query.trim().is_empty() {
+            let search_pattern = format!("%{}%", search_query.trim());
+            sqlx::query(&base_query)
+                .bind(&search_pattern)
+                .bind(&search_pattern)
+                .bind(&search_pattern)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(&pool)
+                .await
+        } else {
+            sqlx::query(&base_query)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(&pool)
+                .await
+        }
+    } else {
+        sqlx::query(&base_query)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(&pool)
+            .await
+    }
+    .map_err(|e| ApiError {
+        message: format!("Failed to fetch customers with stats: {}", e),
+        code: Some("DATABASE_ERROR".to_string()),
+    })?;
 
     let customers: Vec<CustomerWithStats> = rows.into_iter().map(|row| {
         CustomerWithStats {
@@ -305,9 +362,9 @@ pub async fn get_customers_with_stats(
             address: row.get("address"),
             notes: row.get("notes"),
             is_active: row.get("is_active"),
-            total_orders: 0, // TODO: Calculate stats if needed
-            total_spent: 0.0, // TODO: Calculate stats if needed
-            last_order_date: None, // TODO: Calculate stats if needed
+            total_orders: row.get("total_orders"),
+            total_spent: row.get("total_spent"),
+            last_order_date: row.get("last_order_date"),
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
         }

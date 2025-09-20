@@ -248,6 +248,8 @@ pub struct Invoice {
     pub igst_amount: f64,
     pub total: f64,
     pub gst_inclusive: i64,
+    pub payment_method: Option<String>,
+    pub payment_amount: Option<f64>,
     pub status: String,
     pub notes: Option<String>,
     pub created_at: String,
@@ -266,6 +268,8 @@ pub struct CreateInvoiceRequest {
     pub discount_type: Option<String>,
     pub express_charge: Option<f64>,
     pub gst_inclusive: Option<bool>,
+    pub payment_method: Option<String>,
+    pub payment_amount: Option<f64>,
     pub notes: Option<String>,
 }
 
@@ -344,6 +348,14 @@ pub struct InvoiceSearchRequest {
     pub status: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateInvoiceDetailsRequest {
+    pub status: Option<String>,
+    pub payment_method: Option<String>,
+    pub payment_amount: Option<f64>,
+    pub delivery_datetime: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

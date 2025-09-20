@@ -1,40 +1,11 @@
 use crate::database::DatabaseManager;
-use crate::models::{Invoice, InvoiceItem, Customer, Store, ApiResult, ApiError};
+use crate::models::{Invoice, InvoiceItem, Customer, Store, CreateInvoiceRequest, CreateInvoiceItemRequest, CreateInvoiceItemAddonRequest, UpdateInvoiceDetailsRequest, ApiResult, ApiError};
 use crate::services::pricing_engine::{PricingEngine, SimplePricing};
 use sqlx::Row;
 use tauri::State;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 
-#[derive(Debug, Deserialize)]
-pub struct CreateInvoiceRequest {
-    pub customer_id: i64,
-    pub store_id: i64,
-    pub items: Vec<CreateInvoiceItemRequest>,
-    pub discount: f64,
-    pub express_charge: f64,
-    pub payment_method: Option<String>,
-    pub payment_amount: Option<f64>,
-    pub notes: Option<String>,
-    pub gst_inclusive: bool,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CreateInvoiceItemRequest {
-    pub service_id: i64,
-    pub variant_id: Option<i64>,
-    pub description: String,
-    pub qty: f64,
-    pub weight_kg: Option<f64>,
-    pub area_sqft: Option<f64>,
-    pub addons: Vec<CreateInvoiceAddonRequest>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CreateInvoiceAddonRequest {
-    pub addon_id: i64,
-    pub qty: f64,
-}
 
 #[derive(Debug, Serialize)]
 pub struct InvoiceResponse {
@@ -93,23 +64,25 @@ pub async fn create_invoice(
     let invoice_id = sqlx::query(
         r#"
         INSERT INTO invoices (
-            invoice_no, customer_id, store_id, order_datetime, delivery_datetime,
-            subtotal, discount, express_charge, sgst_amount, cgst_amount, igst_amount,
-            total, gst_inclusive, payment_method, payment_amount, status, notes
-        ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, 0, 0, 0, 0, ?, ?, ?, 'pending', ?)
+            invoice_no, customer_id, store_id, order_source, order_datetime, delivery_datetime,
+            subtotal, discount, discount_type, express_charge, sgst_amount, cgst_amount, igst_amount,
+            total, gst_inclusive, status, notes, payment_method, payment_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, 0, 0, 0, ?, 'pending', ?, ?, ?)
         "#
     )
     .bind(&invoice_no)
     .bind(request.customer_id)
     .bind(request.store_id)
+    .bind(request.order_source.as_deref().unwrap_or("WALK-IN"))
     .bind(Utc::now().to_rfc3339())
-    .bind(Utc::now().to_rfc3339()) // Default delivery time
-    .bind(request.discount)
-    .bind(request.express_charge)
-    .bind(request.gst_inclusive)
-    .bind(request.payment_method)
-    .bind(request.payment_amount)
-    .bind(request.notes)
+    .bind(request.delivery_datetime.as_deref().unwrap_or(&Utc::now().to_rfc3339()))
+    .bind(request.discount.unwrap_or(0.0))
+    .bind(request.discount_type.as_deref().unwrap_or("flat"))
+    .bind(request.express_charge.unwrap_or(0.0))
+    .bind(if request.gst_inclusive.unwrap_or(false) { 1 } else { 0 })
+    .bind(request.notes.as_deref())
+    .bind(request.payment_method.as_deref())
+    .bind(request.payment_amount.unwrap_or(0.0))
     .execute(&mut *tx)
     .await
     .map_err(|e| ApiError {
@@ -174,7 +147,7 @@ pub async fn create_invoice(
             item_request.weight_kg,
             item_request.area_sqft,
             gst_rate,
-            request.gst_inclusive,
+            request.gst_inclusive.unwrap_or(false),
         )?;
 
         // Insert invoice item
@@ -189,7 +162,7 @@ pub async fn create_invoice(
         .bind(invoice_id)
         .bind(item_request.service_id)
         .bind(item_request.variant_id)
-        .bind(&item_request.description)
+        .bind(item_request.description.as_deref())
         .bind(item_request.qty)
         .bind(item_request.weight_kg)
         .bind(item_request.area_sqft)
@@ -211,7 +184,8 @@ pub async fn create_invoice(
         total_cgst += pricing.cgst_amount;
 
         // Process addons for this item
-        for addon_request in item_request.addons {
+        if let Some(addons) = &item_request.addons {
+        for addon_request in addons {
             let addon_row = sqlx::query(
                 "SELECT * FROM service_addons WHERE id = ?"
             )
@@ -236,7 +210,7 @@ pub async fn create_invoice(
                 None,
                 None,
                 addon_gst_rate,
-                request.gst_inclusive,
+                request.gst_inclusive.unwrap_or(false),
             )?;
 
             // Insert addon
@@ -266,10 +240,11 @@ pub async fn create_invoice(
             total_sgst += addon_pricing.sgst_amount;
             total_cgst += addon_pricing.cgst_amount;
         }
+        }
     }
 
     // Calculate final totals
-    let final_total = subtotal - request.discount + request.express_charge + total_sgst + total_cgst;
+    let final_total = subtotal - request.discount.unwrap_or(0.0) + request.express_charge.unwrap_or(0.0) + total_sgst + total_cgst;
 
     // Update invoice with calculated totals
     sqlx::query(
@@ -528,15 +503,8 @@ pub async fn update_invoice(
         params.push(status.to_string());
     }
 
-    if let Some(payment_method) = update_data.get("payment_method").and_then(|v| v.as_str()) {
-        updates.push("payment_method = ?");
-        params.push(payment_method.to_string());
-    }
-
-    if let Some(payment_amount) = update_data.get("payment_amount").and_then(|v| v.as_f64()) {
-        updates.push("payment_amount = ?");
-        params.push(payment_amount.to_string());
-    }
+    // Payment method and amount fields are not in the current schema
+    // These would need to be added to the invoices table if needed
 
     if let Some(notes) = update_data.get("notes").and_then(|v| v.as_str()) {
         updates.push("notes = ?");
@@ -602,6 +570,80 @@ pub async fn update_invoice_status(
             code: Some("UPDATE_STATUS_ERROR".to_string()),
         })?;
 
+    let invoice = sqlx::query_as::<_, Invoice>("SELECT * FROM invoices WHERE id = ?")
+        .bind(invoice_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| ApiError {
+            message: format!("Database error: {}", e),
+            code: Some("DATABASE_ERROR".to_string()),
+        })?
+        .ok_or_else(|| ApiError {
+            message: "Invoice not found".to_string(),
+            code: Some("INVOICE_NOT_FOUND".to_string()),
+        })?;
+
+    Ok(invoice)
+}
+
+#[tauri::command]
+pub async fn update_invoice_details(
+    state: State<'_, crate::AppState>,
+    invoice_id: i64,
+    request: UpdateInvoiceDetailsRequest,
+) -> ApiResult<Invoice> {
+    let pool = state.db.get_pool_cloned();
+
+    // Use separate queries for each field to avoid dynamic query building complexity
+    if let Some(status) = &request.status {
+        sqlx::query("UPDATE invoices SET status = ? WHERE id = ?")
+            .bind(status)
+            .bind(invoice_id)
+            .execute(&pool)
+            .await
+            .map_err(|e| ApiError {
+                message: format!("Failed to update status: {}", e),
+                code: Some("UPDATE_STATUS_ERROR".to_string()),
+            })?;
+    }
+
+    if let Some(payment_method) = &request.payment_method {
+        sqlx::query("UPDATE invoices SET payment_method = ? WHERE id = ?")
+            .bind(payment_method)
+            .bind(invoice_id)
+            .execute(&pool)
+            .await
+            .map_err(|e| ApiError {
+                message: format!("Failed to update payment method: {}", e),
+                code: Some("UPDATE_PAYMENT_METHOD_ERROR".to_string()),
+            })?;
+    }
+
+    if let Some(payment_amount) = request.payment_amount {
+        sqlx::query("UPDATE invoices SET payment_amount = ? WHERE id = ?")
+            .bind(payment_amount)
+            .bind(invoice_id)
+            .execute(&pool)
+            .await
+            .map_err(|e| ApiError {
+                message: format!("Failed to update payment amount: {}", e),
+                code: Some("UPDATE_PAYMENT_AMOUNT_ERROR".to_string()),
+            })?;
+    }
+
+    if let Some(delivery_datetime) = &request.delivery_datetime {
+        sqlx::query("UPDATE invoices SET delivery_datetime = ? WHERE id = ?")
+            .bind(delivery_datetime)
+            .bind(invoice_id)
+            .execute(&pool)
+            .await
+            .map_err(|e| ApiError {
+                message: format!("Failed to update delivery datetime: {}", e),
+                code: Some("UPDATE_DELIVERY_ERROR".to_string()),
+            })?;
+    }
+
+    // Return the updated invoice
     let invoice = sqlx::query_as::<_, Invoice>("SELECT * FROM invoices WHERE id = ?")
         .bind(invoice_id)
         .fetch_optional(&pool)
