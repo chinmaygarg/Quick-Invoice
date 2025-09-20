@@ -341,6 +341,36 @@ npm run dev
 
 The application should open in a desktop window. If successful, you'll see the UCLEAN interface.
 
+### 6. Browser Setup for Invoice Generation
+
+UCLEAN uses HTML-based invoice generation with automatic browser printing:
+
+```bash
+# Ensure Chrome is installed (recommended browser)
+# macOS
+brew install --cask google-chrome
+
+# Ubuntu/Debian
+wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+sudo sh -c 'echo "deb [arch=amd64] https://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+sudo apt update && sudo apt install google-chrome-stable
+
+# Windows (using winget)
+winget install Google.Chrome
+```
+
+**Browser Requirements:**
+- **Chrome**: Recommended for best print compatibility
+- **Firefox**: Supported with manual print setup
+- **Safari**: Supported on macOS
+- **Edge**: Supported on Windows
+
+**Print Settings Verification:**
+1. Open browser print dialog (Ctrl+P / Cmd+P)
+2. Verify paper size options (A4, A5, Custom)
+3. Check print margins and scaling
+4. Test print preview functionality
+
 ## 🔄 Development Workflow
 
 ### Daily Development Routine
@@ -496,6 +526,58 @@ npm run dev  # Will recreate database
 # Check file permissions
 ls -la src-tauri/database.sqlite
 chmod 644 src-tauri/database.sqlite  # If needed
+```
+
+#### HTML Invoice Generation Issues
+
+**Issue**: Invoice HTML files not opening in browser
+```bash
+# Check if Chrome is installed and set as default
+# macOS
+open -a "Google Chrome" --args --version
+
+# Linux
+google-chrome --version
+
+# Windows
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --version
+```
+
+**Issue**: Print dialog not appearing automatically
+```javascript
+// Check browser security settings
+// Chrome: chrome://settings/content/popups
+// Ensure UCLEAN app domain is allowed for popups
+
+// Alternative: Check console for errors
+// Press F12 in browser and check for JavaScript errors
+```
+
+**Issue**: HTML files generated but showing errors
+```bash
+# Check HTML file permissions
+ls -la ~/Library/Application\ Support/com.uclean.app/UCLEAN/Invoices/  # macOS
+ls -la ~/.local/share/com.uclean.app/UCLEAN/Invoices/                   # Linux
+dir "%APPDATA%\com.uclean.app\UCLEAN\Invoices\"                         # Windows
+
+# Verify HTML content is valid
+file ~/Library/Application\ Support/com.uclean.app/UCLEAN/Invoices/*.html
+```
+
+**Issue**: Browser opening wrong files or showing blank pages
+```bash
+# Clear browser cache
+# Chrome: Ctrl+Shift+Del (clear browsing data)
+
+# Check default browser setting
+# macOS
+defaults read com.apple.LaunchServices/com.apple.launchservices.secure LSHandlers
+
+# Linux
+xdg-settings get default-web-browser
+
+# Windows
+# Check default apps in Windows settings
 ```
 
 ### Performance Optimization

@@ -13,7 +13,7 @@ A professional desktop invoice generation system built with Tauri, React, and Ru
 ### 🧾 **Invoice Management**
 - 🖨️ **Multiple Print Formats**: A5, A4, and 80mm Thermal printer support
 - 💰 **GST Compliance**: Automatic SGST, CGST, and IGST calculations with HSN codes
-- 📄 **PDF Generation**: High-quality invoice PDFs with custom branding
+- 🌐 **HTML Invoice Generation**: High-quality HTML invoices with auto-print browser integration
 - 🔢 **Auto Numbering**: Sequential invoice numbering with customizable format
 - 📅 **Complete Date Tracking**: Order, pickup, delivery, and due date management
 - 💱 **Currency in Words**: Automatic amount-to-words conversion
@@ -146,11 +146,12 @@ uclean/
 │   │   │   ├── store_handler.rs
 │   │   │   ├── report_handler.rs
 │   │   │   ├── pricing_handler.rs
-│   │   │   └── pdf_handler.rs
+│   │   │   └── html_handler.rs
 │   │   ├── models/              # Data models and types
 │   │   ├── services/            # Business logic
 │   │   │   ├── pricing_engine.rs
-│   │   │   └── pdf_generator.rs
+│   │   │   ├── html_generator.rs
+│   │   │   └── template_engine.rs
 │   │   ├── utils/               # Helper functions
 │   │   └── main.rs              # Application entry point
 │   ├── icons/                   # Application icons
@@ -211,6 +212,7 @@ cargo clean              # Clean build artifacts
 - **Serde**: Serialization/deserialization framework
 - **Chrono**: Date and time handling
 - **Anyhow**: Error handling
+- **Tera**: Template engine for HTML generation
 
 #### Build Tools
 - **Vite**: Fast build tool and development server
@@ -275,6 +277,7 @@ The system uses SQLite with the following main entities:
    - Add custom notes and terms
    - Apply discounts or express charges
    - Set pickup and delivery dates
+   - HTML invoices open automatically in browser with print dialog
 
 ### Reports and Analytics
 
@@ -415,16 +418,18 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Check file permissions in the application data directory
 
 **Print Issues:**
-- Verify printer drivers are installed
-- Check printer settings in system preferences
+- Ensure Chrome browser is installed and set as default
+- Check browser print settings and page setup
 - Try different print formats (A4, A5, Thermal)
+- Verify HTML files are opening correctly in browser
 
 **Performance Issues:**
 - Check available disk space (SQLite database grows over time)
 - Consider archiving old invoices
-- Monitor system resources during PDF generation
+- Monitor system resources during HTML generation
+- Clear browser cache if print previews are slow
 
-For more detailed troubleshooting, see [docs/DEVELOPMENT_SETUP.md](docs/DEVELOPMENT_SETUP.md).
+For more detailed troubleshooting, see [docs/DEVELOPMENT_SETUP.md](docs/DEVELOPMENT_SETUP.md) and [docs/BUILD_GUIDE.md](docs/BUILD_GUIDE.md).
 
 ## 📞 Support
 

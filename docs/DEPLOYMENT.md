@@ -68,6 +68,111 @@ cargo audit
 - [ ] CHANGELOG.md updated with release notes
 - [ ] API documentation current
 - [ ] User manual updated
+- [ ] Browser requirements documented for HTML invoice system
+
+## 🌐 HTML Invoice System Deployment
+
+UCLEAN uses HTML-based invoice generation with browser integration for printing. This section covers deployment considerations specific to the HTML invoice system.
+
+### Browser Requirements
+
+#### Supported Browsers
+| Browser | Windows | macOS | Linux | Print Quality | Auto-Print |
+|---------|---------|-------|-------|---------------|------------|
+| **Chrome** | ✅ | ✅ | ✅ | Excellent | ✅ |
+| **Firefox** | ✅ | ✅ | ✅ | Good | ⚠️ Manual |
+| **Safari** | ❌ | ✅ | ❌ | Good | ⚠️ Manual |
+| **Edge** | ✅ | ❌ | ❌ | Excellent | ✅ |
+
+#### Chrome Installation Verification
+```bash
+# Verify Chrome is available
+# Windows
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --version
+
+# macOS
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --version
+
+# Linux
+google-chrome --version || google-chrome-stable --version
+```
+
+### HTML Invoice System Configuration
+
+#### File System Access
+UCLEAN generates HTML invoices in platform-specific directories:
+
+**Windows:**
+```
+%APPDATA%\com.uclean.app\UCLEAN\Invoices\
+C:\Users\{username}\AppData\Roaming\com.uclean.app\UCLEAN\Invoices\
+```
+
+**macOS:**
+```
+~/Library/Application Support/com.uclean.app/UCLEAN/Invoices/
+```
+
+**Linux:**
+```
+~/.local/share/com.uclean.app/UCLEAN/Invoices/
+# or
+$XDG_DATA_HOME/com.uclean.app/UCLEAN/Invoices/
+```
+
+#### Browser Security Settings
+
+For automatic print dialog functionality, ensure:
+
+1. **Pop-up blocking disabled** for UCLEAN-generated HTML files
+2. **JavaScript enabled** for auto-print functionality
+3. **File protocol access** permitted for local HTML files
+
+#### Deployment Testing
+
+```bash
+# Test HTML invoice generation
+npm run test:html-invoices
+
+# Test browser integration
+npm run test:browser-print
+
+# Test file system permissions
+npm run test:file-permissions
+```
+
+### Print Configuration Validation
+
+#### Pre-deployment Print Testing
+```bash
+# Generate test invoice HTML
+npm run generate-test-invoice
+
+# Open in each supported browser
+# Chrome
+google-chrome file:///path/to/test-invoice.html
+
+# Firefox
+firefox file:///path/to/test-invoice.html
+
+# Safari (macOS only)
+open -a Safari file:///path/to/test-invoice.html
+```
+
+#### Paper Size Support Matrix
+| Format | Chrome | Firefox | Safari | Edge | Thermal Printers |
+|--------|--------|---------|--------|------|------------------|
+| **A4** | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **A5** | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Thermal (80mm)** | ✅ | ⚠️ Manual | ⚠️ Manual | ✅ | ✅ |
+
+### User Documentation Requirements
+
+Include in deployment package:
+- **Browser setup guide** for optimal printing
+- **Print settings configuration** instructions
+- **Troubleshooting guide** for common print issues
+- **Alternative print methods** if auto-print fails
 
 ## 🔧 Environment Setup
 
@@ -1249,6 +1354,61 @@ strace -e trace=network ./uclean
 
 # Monitor file operations
 lsof -p $(pgrep uclean)
+```
+
+### HTML Invoice System Issues
+
+#### Browser Integration Problems
+```bash
+# Issue: HTML files not opening in browser
+# Check default browser setting
+# Windows
+reg query "HKEY_CURRENT_USER\Software\Microsoft\Windows\Shell\Associations\URLAssociations\http\UserChoice"
+
+# macOS
+defaults read com.apple.LaunchServices/com.apple.launchservices.secure LSHandlers | grep -A2 -B2 "LSHandlerURLScheme.*http"
+
+# Linux
+xdg-settings get default-web-browser
+```
+
+#### Print Dialog Issues
+```javascript
+// Issue: Auto-print not working
+// Add to HTML template debugging:
+window.addEventListener('load', () => {
+    console.log('Page loaded, attempting to print...');
+    setTimeout(() => {
+        if (window.print) {
+            window.print();
+            console.log('Print dialog should be shown');
+        } else {
+            console.error('Print function not available');
+        }
+    }, 500);
+});
+```
+
+#### File Permission Problems
+```bash
+# Issue: HTML files not accessible
+# Check file permissions
+ls -la ~/Library/Application\ Support/com.uclean.app/UCLEAN/Invoices/  # macOS
+ls -la ~/.local/share/com.uclean.app/UCLEAN/Invoices/                  # Linux
+icacls %APPDATA%\com.uclean.app\UCLEAN\Invoices\                      # Windows
+
+# Fix permissions if needed
+chmod 644 ~/Library/Application\ Support/com.uclean.app/UCLEAN/Invoices/*.html
+```
+
+#### Browser Security Restrictions
+```bash
+# Issue: Local file restrictions
+# Chrome workaround for local file access
+google-chrome --allow-file-access-from-files --disable-web-security --user-data-dir=/tmp/chrome_dev
+
+# Firefox: about:config settings
+# security.fileuri.strict_origin_policy = false (for development only)
 ```
 
 ## 📊 Deployment Checklist
