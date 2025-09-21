@@ -133,3 +133,7 @@ jspm_packages/
 
 # TernJS port file
 .tern-port
+
+# Untracked files
+ImageMagick-static-x64.exe
+rustup-init.exe
