@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { save, open } from '@tauri-apps/api/dialog';
 import { useApp } from '@/contexts/AppContext';
@@ -7,6 +7,21 @@ export function Settings() {
   const { showNotification, setLoading } = useApp();
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [databasePath, setDatabasePath] = useState<string>('./database.sqlite');
+
+  useEffect(() => {
+    const fetchDatabasePath = async () => {
+      try {
+        const path = await invoke<string>('get_database_path');
+        setDatabasePath(path);
+      } catch (error) {
+        console.error('Failed to get database path:', error);
+        // Keep the default value if fetching fails
+      }
+    };
+
+    fetchDatabasePath();
+  }, []);
 
   const handleBackup = async () => {
     try {
@@ -207,7 +222,7 @@ export function Settings() {
             </div>
             <div>
               <dt className="text-sm font-medium text-gray-500">Database Location</dt>
-              <dd className="text-sm text-gray-900">./database.sqlite</dd>
+              <dd className="text-sm text-gray-900 break-all">{databasePath}</dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-gray-500">Last Backup</dt>

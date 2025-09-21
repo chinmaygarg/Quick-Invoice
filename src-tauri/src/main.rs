@@ -125,6 +125,7 @@ async fn main() {
             initialize_database,
             backup_database,
             restore_database,
+            get_database_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -170,5 +171,13 @@ async fn restore_database(
     match state.db.restore_from_file(&app_handle, &backup_path).await {
         Ok(_) => Ok("Database restored successfully".to_string()),
         Err(e) => Err(format!("Failed to restore database: {}", e)),
+    }
+}
+
+#[tauri::command]
+async fn get_database_path(app_handle: tauri::AppHandle) -> Result<String, String> {
+    match DatabaseManager::get_database_path(&app_handle) {
+        Ok(path) => Ok(path.to_string_lossy().to_string()),
+        Err(e) => Err(format!("Failed to get database path: {}", e)),
     }
 }
