@@ -266,14 +266,51 @@ pnpm test:e2e          # E2E tests
 ```
 
 ### Production Build
-```bash
-# Create optimized build
-pnpm tauri build
 
-# Generate installer
-pnpm tauri build --target universal-apple-darwin  # macOS
-pnpm tauri build --target x86_64-pc-windows-msvc  # Windows
-pnpm tauri build --target x86_64-unknown-linux-gnu # Linux
+#### Cross-Platform Icons
+```bash
+# Generate platform-specific icons (.ico, .icns) from PNG
+npx @tauri-apps/cli icon ./icons/icon.png
+```
+
+#### Platform-Specific Builds
+```bash
+# Build for current platform
+npm run build
+
+# Build for specific platforms
+npm run build:windows     # Windows x64
+npm run build:mac         # macOS x64
+npm run build:mac-arm     # macOS ARM64 (M1/M2)
+npm run build:linux       # Linux x64
+npm run build:all         # All platforms (requires cross-compilation setup)
+
+# Debug builds
+npm run build:dev         # Debug build for current platform
+```
+
+#### GitHub Actions (Automated Cross-Platform Builds)
+The project includes a GitHub Actions workflow (`.github/workflows/build.yml`) that:
+- Runs tests and linting on every push/PR
+- Builds for all platforms automatically on main branch
+- Creates draft releases with platform-specific installers
+- Supports manual workflow dispatch for custom builds
+
+To use:
+1. Push changes to main branch or create a PR
+2. GitHub Actions will automatically build for Windows, macOS, and Linux
+3. Check the Actions tab for build status and download artifacts
+
+#### Manual Cross-Compilation Setup
+```bash
+# Add Rust targets for cross-compilation
+rustup target add x86_64-pc-windows-msvc      # Windows
+rustup target add x86_64-apple-darwin         # macOS x64
+rustup target add aarch64-apple-darwin        # macOS ARM64
+rustup target add x86_64-unknown-linux-gnu    # Linux
+
+# Build with specific target
+cargo build --release --target x86_64-pc-windows-msvc
 ```
 
 ## Common Commands
@@ -320,6 +357,12 @@ pnpm format
 2. **Tauri build failures**: Check Rust toolchain and dependencies
 3. **PDF generation issues**: Verify jsPDF configuration for A5 layout
 4. **State management**: Use React DevTools for debugging
+5. **Cross-platform build issues**:
+   - **Missing icons**: Run `npx @tauri-apps/cli icon ./icons/icon.png` to generate `.ico` and `.icns` files
+   - **Windows builds on macOS/Linux**: Use GitHub Actions or Windows machine
+   - **Target not found**: Install Rust target with `rustup target add <target-name>`
+   - **GitHub Actions failures**: Check workflow logs and ensure all required secrets are set
+6. **Icon generation failures**: Ensure source icon is high quality PNG (512x512 or larger)
 
 ### Debug Mode
 ```bash

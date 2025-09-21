@@ -14,7 +14,7 @@ interface Service {
   min_quantity: number;
   variants_count: number;
   addons_count: number;
-  is_active: boolean;
+  is_active: number;
   created_at: string;
 }
 
@@ -355,7 +355,7 @@ export function ServiceList() {
                     <div
                       key={service.id}
                       className={`border rounded-lg p-4 hover:shadow-md transition-shadow ${
-                        !service.is_active ? 'border-gray-200 bg-gray-50' : 'border-gray-200'
+                        !Boolean(service.is_active) ? 'border-gray-200 bg-gray-50' : 'border-gray-200'
                       }`}
                       data-testid="service-card"
                     >
@@ -369,10 +369,10 @@ export function ServiceList() {
                               className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                               data-testid={`select-service-${service.id}`}
                             />
-                            <h4 className={`font-medium ${!service.is_active ? 'text-gray-500' : 'text-gray-900'}`}>
+                            <h4 className={`font-medium ${!Boolean(service.is_active) ? 'text-gray-500' : 'text-gray-900'}`}>
                               {service.name}
                             </h4>
-                            {!service.is_active && (
+                            {!Boolean(service.is_active) && (
                               <span className="badge badge-error badge-sm">Inactive</span>
                             )}
                           </div>
@@ -412,15 +412,15 @@ export function ServiceList() {
                         </div>
                         <div className="flex items-center space-x-2">
                           <button
-                            onClick={() => handleToggleServiceStatus(service.id, service.is_active)}
+                            onClick={() => handleToggleServiceStatus(service.id, Boolean(service.is_active))}
                             className={`text-xs font-medium ${
-                              service.is_active
+                              Boolean(service.is_active)
                                 ? 'text-yellow-600 hover:text-yellow-700'
                                 : 'text-green-600 hover:text-green-700'
                             }`}
                             data-testid={`toggle-service-${service.id}`}
                           >
-                            {service.is_active ? 'Deactivate' : 'Activate'}
+                            {Boolean(service.is_active) ? 'Deactivate' : 'Activate'}
                           </button>
                           <Link
                             to={`/service/edit/${service.id}`}
@@ -481,7 +481,7 @@ export function ServiceList() {
                     </td>
                     <td className="table-cell">
                       <div>
-                        <div className={`font-medium ${!service.is_active ? 'text-gray-500' : 'text-gray-900'}`}>
+                        <div className={`font-medium ${!Boolean(service.is_active) ? 'text-gray-500' : 'text-gray-900'}`}>
                           {service.name}
                         </div>
                         {service.description && (
@@ -513,21 +513,21 @@ export function ServiceList() {
                       </div>
                     </td>
                     <td className="table-cell">
-                      <span className={`badge ${service.is_active ? 'badge-success' : 'badge-error'} badge-sm`}>
-                        {service.is_active ? 'Active' : 'Inactive'}
+                      <span className={`badge ${Boolean(service.is_active) ? 'badge-success' : 'badge-error'} badge-sm`}>
+                        {Boolean(service.is_active) ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td className="table-cell">
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => handleToggleServiceStatus(service.id, service.is_active)}
+                          onClick={() => handleToggleServiceStatus(service.id, Boolean(service.is_active))}
                           className={`text-sm font-medium ${
-                            service.is_active
+                            Boolean(service.is_active)
                               ? 'text-yellow-600 hover:text-yellow-700'
                               : 'text-green-600 hover:text-green-700'
                           }`}
                         >
-                          {service.is_active ? 'Deactivate' : 'Activate'}
+                          {Boolean(service.is_active) ? 'Deactivate' : 'Activate'}
                         </button>
                         <Link
                           to={`/service/edit/${service.id}`}

@@ -33,19 +33,27 @@ export function QuickStats() {
       // Fetch stats in parallel
       const [salesSummary, customers, pendingInvoices] = await Promise.all([
         invoke('get_sales_summary', {
-          dateFrom: todayStart,
-          dateTo: todayEnd,
-        }).catch(() => ({ total_invoices: 0, total_amount: 0 })),
+          dateRange: {
+            start_date: todayStart,
+            end_date: todayEnd,
+          }
+        }).catch(() => ({ total_invoices: 0, total_revenue: 0 })),
         invoke('search_customers', { query: null, limit: 1000 }).catch(() => []),
         invoke('search_invoices', {
-          status: 'pending',
-          limit: 100
-        }).catch(() => []),
+          query: {
+            status: 'pending',
+            limit: 100
+          }
+        }).catch((error) => {
+          console.error('Error fetching pending invoices:', error);
+          return [];
+        }),
       ]);
+
 
       setStats({
         todaysInvoices: salesSummary.total_invoices || 0,
-        todaysRevenue: salesSummary.total_amount || 0,
+        todaysRevenue: salesSummary.total_revenue || 0,
         pendingInvoices: Array.isArray(pendingInvoices) ? pendingInvoices.length : 0,
         totalCustomers: Array.isArray(customers) ? customers.length : 0,
       });

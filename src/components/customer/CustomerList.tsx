@@ -54,8 +54,8 @@ export function CustomerList() {
 
       const result = await invoke('get_customers_with_stats', {
         query: debouncedSearchQuery,
-        sort_by: sortBy,
-        sort_order: sortOrder,
+        sortBy: sortBy,
+        sortOrder: sortOrder,
         limit: 100,
         offset: 0,
       });
