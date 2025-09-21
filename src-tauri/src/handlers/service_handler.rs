@@ -35,14 +35,30 @@ pub async fn create_service(
         code: Some("DATABASE_ERROR".to_string()),
     })?;
 
+    // Find category_id from category name
+    let category_id = if let Some(category_name) = &request.category {
+        let result = sqlx::query("SELECT id FROM service_categories WHERE name = ?")
+            .bind(category_name)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| ApiError {
+                message: format!("Failed to find category: {}", e),
+                code: Some("DATABASE_ERROR".to_string()),
+            })?;
+
+        result.map(|row| row.get::<i64, _>("id"))
+    } else {
+        None
+    };
+
     // Insert new service
     let service_result = sqlx::query(
-        "INSERT INTO services (name, category, description, base_price, gst_rate, unit, min_quantity, is_active, created_at, updated_at)
+        "INSERT INTO services (name, category_id, description, base_price, gst_rate, unit, min_quantity, is_active, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-         RETURNING id, name, category, description, base_price, gst_rate, unit, min_quantity, is_active, created_at, updated_at"
+         RETURNING id, name, description, base_price, gst_rate, unit, min_quantity, is_active, created_at, updated_at"
     )
     .bind(&request.name)
-    .bind(&request.category)
+    .bind(category_id)
     .bind(&request.description)
     .bind(request.base_price)
     .bind(request.gst_rate)
@@ -107,19 +123,11 @@ pub async fn create_service(
         code: Some("DATABASE_ERROR".to_string()),
     })?;
 
-    Ok(Service {
-        id: service_result.get("id"),
-        name: service_result.get("name"),
-        category: service_result.get("category"),
-        description: service_result.get("description"),
-        base_price: service_result.get("base_price"),
-        gst_rate: service_result.get("gst_rate"),
-        unit: service_result.get("unit"),
-        min_quantity: service_result.get("min_quantity"),
-        is_active: service_result.get("is_active"),
-        created_at: service_result.get("created_at"),
-        updated_at: service_result.get("updated_at"),
-    })
+    // Get the created service with category name
+    let service_id: i64 = service_result.get("id");
+    let created_service = get_service_by_id(state, service_id).await?;
+
+    Ok(created_service)
 }
 
 #[tauri::command]
@@ -296,7 +304,7 @@ pub async fn search_services(
         // No search query
         if let Some(cat) = &category {
             if !cat.trim().is_empty() {
-                let query_sql = format!("{} WHERE {} AND sc.name = ? ORDER BY s.name ASC LIMIT ? OFFSET ?", base_query, active_filter);
+                let query_sql = format!("{} WHERE {} AND s.category = ? ORDER BY s.name ASC LIMIT ? OFFSET ?", base_query, active_filter);
                 let rows = sqlx::query(&query_sql)
                     .bind(cat)
                     .bind(limit)
@@ -384,16 +392,32 @@ pub async fn update_service(
         code: Some("DATABASE_ERROR".to_string()),
     })?;
 
+    // Find category_id from category name
+    let category_id = if let Some(category_name) = &request.category {
+        let result = sqlx::query("SELECT id FROM service_categories WHERE name = ?")
+            .bind(category_name)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| ApiError {
+                message: format!("Failed to find category: {}", e),
+                code: Some("DATABASE_ERROR".to_string()),
+            })?;
+
+        result.map(|row| row.get::<i64, _>("id"))
+    } else {
+        None
+    };
+
     // Update service
     let service_result = sqlx::query(
         "UPDATE services
-         SET name = ?, category = ?, description = ?, base_price = ?, gst_rate = ?,
+         SET name = ?, category_id = ?, description = ?, base_price = ?, gst_rate = ?,
              unit = ?, min_quantity = ?, is_active = ?, updated_at = datetime('now')
          WHERE id = ?
-         RETURNING id, name, category, description, base_price, gst_rate, unit, min_quantity, is_active, created_at, updated_at"
+         RETURNING id, name, description, base_price, gst_rate, unit, min_quantity, is_active, created_at, updated_at"
     )
     .bind(&request.name)
-    .bind(&request.category)
+    .bind(category_id)
     .bind(&request.description)
     .bind(request.base_price)
     .bind(request.gst_rate)
@@ -476,19 +500,10 @@ pub async fn update_service(
         code: Some("DATABASE_ERROR".to_string()),
     })?;
 
-    Ok(Service {
-        id: service_result.get("id"),
-        name: service_result.get("name"),
-        category: service_result.get("category"),
-        description: service_result.get("description"),
-        base_price: service_result.get("base_price"),
-        gst_rate: service_result.get("gst_rate"),
-        unit: service_result.get("unit"),
-        min_quantity: service_result.get("min_quantity"),
-        is_active: service_result.get("is_active"),
-        created_at: service_result.get("created_at"),
-        updated_at: service_result.get("updated_at"),
-    })
+    // Get the updated service with category name
+    let updated_service = get_service_by_id(state, service_id).await?;
+
+    Ok(updated_service)
 }
 
 #[tauri::command]

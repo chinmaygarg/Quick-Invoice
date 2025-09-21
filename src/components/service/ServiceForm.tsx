@@ -44,18 +44,13 @@ interface ValidationErrors {
   addons?: Record<number, Record<string, string>>;
 }
 
-const SERVICE_CATEGORIES = [
-  'Dry Cleaning',
-  'Wash & Fold',
-  'Pressing',
-  'Alterations',
-  'Shoe Care',
-  'Leather Care',
-  'Bedding',
-  'Curtains',
-  'Bags & Accessories',
-  'Special Items',
-];
+interface ServiceCategory {
+  id: number;
+  name: string;
+  parent_id?: number;
+  is_active: number;
+  created_at: string;
+}
 
 const COMMON_UNITS = [
   'piece',
@@ -74,9 +69,10 @@ export function ServiceForm() {
   const { id } = useParams();
   const { showNotification, setLoading } = useApp();
 
+  const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [formData, setFormData] = useState<ServiceFormData>({
     name: '',
-    category: SERVICE_CATEGORIES[0],
+    category: '',
     description: '',
     basePrice: 0,
     gstRate: 18,
@@ -90,43 +86,75 @@ export function ServiceForm() {
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<'basic' | 'variants' | 'addons'>('basic');
+  const [loading, setLoadingLocal] = useState(true);
 
+  // Load categories and service data together
   useEffect(() => {
-    if (id && id !== 'new') {
-      loadService(parseInt(id));
-    }
-  }, [id]);
+    const loadData = async () => {
+      try {
+        setLoadingLocal(true);
 
-  const loadService = async (serviceId: number) => {
-    try {
-      setLoading(true);
-      const service = await invoke('get_service_by_id', { serviceId });
-      const variants = await invoke('get_service_variants', { serviceId });
-      const addons = await invoke('get_service_addons', { serviceId });
+        // Load categories first
+        const categoriesData = await invoke<ServiceCategory[]>('get_service_categories');
+        setCategories(categoriesData);
 
-      setFormData({
-        name: service.name || '',
-        category: service.category || SERVICE_CATEGORIES[0],
-        description: service.description || '',
-        basePrice: service.base_price || 0,
-        gstRate: service.gst_rate || 18,
-        unit: service.unit || 'piece',
-        minQuantity: service.min_quantity || 1,
-        isActive: service.is_active,
-        variants: variants || [],
-        addons: addons || [],
-      });
-    } catch (error) {
-      showNotification({
-        type: 'error',
-        title: 'Load Failed',
-        message: `Failed to load service: ${error}`,
-      });
-      navigate('/services');
-    } finally {
-      setLoading(false);
-    }
-  };
+        // Then load service if editing
+        if (id && id !== 'new') {
+          const serviceId = parseInt(id);
+          if (isNaN(serviceId)) {
+            throw new Error('Invalid service ID');
+          }
+
+          const [service, variants, addons] = await Promise.all([
+            invoke('get_service_by_id', { serviceId }),
+            invoke('get_service_variants', { serviceId }),
+            invoke('get_service_addons', { serviceId })
+          ]);
+
+          if (!service) {
+            throw new Error('Service not found');
+          }
+
+          setFormData({
+            name: service.name || '',
+            category: service.category || (categoriesData.length > 0 ? categoriesData[0].name : ''),
+            description: service.description || '',
+            basePrice: service.base_price || 0,
+            gstRate: service.gst_rate || 18,
+            unit: service.unit || 'piece',
+            minQuantity: service.min_quantity || 1,
+            isActive: Boolean(service.is_active),
+            variants: (variants || []).map(v => ({
+              ...v,
+              isActive: Boolean(v.is_active)
+            })),
+            addons: (addons || []).map(a => ({
+              ...a,
+              isActive: Boolean(a.is_active)
+            })),
+          });
+        } else if (categoriesData.length > 0) {
+          // New service - set default category
+          setFormData(prev => ({ ...prev, category: categoriesData[0].name }));
+        }
+      } catch (error) {
+        console.error('Failed to load data:', error);
+        showNotification({
+          type: 'error',
+          title: 'Load Failed',
+          message: `Failed to load data: ${error}`,
+        });
+        if (id && id !== 'new') {
+          navigate('/services');
+        }
+      } finally {
+        setLoadingLocal(false);
+      }
+    };
+
+    loadData();
+  }, [id, showNotification, navigate]);
+
 
   const validateForm = (): boolean => {
     const errors: ValidationErrors = {};
@@ -355,6 +383,29 @@ export function ServiceForm() {
     }).format(amount);
   };
 
+  if (loading || categories.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900">
+            {id && id !== 'new' ? 'Edit Service' : 'Add New Service'}
+          </h1>
+        </div>
+        <div className="bg-white rounded-xl shadow-soft p-6">
+          <div className="animate-pulse space-y-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="flex items-center space-x-4">
+                <div className="bg-gray-200 h-4 w-32 rounded"></div>
+                <div className="bg-gray-200 h-4 w-24 rounded"></div>
+                <div className="bg-gray-200 h-4 w-20 rounded"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6" data-testid="service-form">
       {/* Header */}
@@ -461,8 +512,8 @@ export function ServiceForm() {
                     className={`form-input ${validationErrors.category ? 'border-error-500' : ''}`}
                     data-testid="service-category-select"
                   >
-                    {SERVICE_CATEGORIES.map(category => (
-                      <option key={category} value={category}>{category}</option>
+                    {categories.map(category => (
+                      <option key={category.id} value={category.name}>{category.name}</option>
                     ))}
                   </select>
                   {validationErrors.category && (

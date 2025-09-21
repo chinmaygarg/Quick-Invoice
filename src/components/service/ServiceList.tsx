@@ -66,7 +66,7 @@ export function ServiceList() {
       const result = await invoke('search_services', {
         query: debouncedSearchQuery,
         category: selectedCategory === 'all' ? null : selectedCategory,
-        includeInactive: showInactiveServices,
+        include_inactive: showInactiveServices,
         limit: 100,
       });
 
