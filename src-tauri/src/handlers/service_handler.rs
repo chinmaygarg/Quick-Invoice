@@ -286,9 +286,8 @@ pub async fn search_services(
                 }
             } else {
                 // No filters
-                let query_sql = format!("{} WHERE s.is_active = ? ORDER BY s.name ASC LIMIT ? OFFSET ?", base_query);
+                let query_sql = format!("{} WHERE {} ORDER BY s.name ASC LIMIT ? OFFSET ?", base_query, active_filter);
                 let rows = sqlx::query(&query_sql)
-                    .bind(1)
                     .bind(limit)
                     .bind(offset)
                     .fetch_all(&pool)
@@ -304,7 +303,7 @@ pub async fn search_services(
         // No search query
         if let Some(cat) = &category {
             if !cat.trim().is_empty() {
-                let query_sql = format!("{} WHERE {} AND s.category = ? ORDER BY s.name ASC LIMIT ? OFFSET ?", base_query, active_filter);
+                let query_sql = format!("{} WHERE {} AND sc.name = ? ORDER BY s.name ASC LIMIT ? OFFSET ?", base_query, active_filter);
                 let rows = sqlx::query(&query_sql)
                     .bind(cat)
                     .bind(limit)

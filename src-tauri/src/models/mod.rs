@@ -220,7 +220,7 @@ pub struct ServiceWithDetails {
     pub gst_rate: f64,
     pub unit: String,
     pub min_quantity: i64,
-    pub is_active: Option<i64>,
+    pub is_active: i64,
     pub variants_count: i64,
     pub addons_count: i64,
     pub created_at: String,
