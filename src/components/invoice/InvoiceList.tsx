@@ -6,6 +6,7 @@ import { DataTable } from '../common/DataTable';
 import { SearchBar } from '../common/SearchBar';
 import { Modal } from '../common/Modal';
 import { InvoiceHTMLPreview } from './InvoiceHTMLPreview';
+import { TagPrintButton } from './TagPrintButton';
 import { invoke } from '@tauri-apps/api/tauri';
 import { open } from '@tauri-apps/api/shell';
 import { toast } from 'react-hot-toast';
@@ -24,12 +25,22 @@ interface Invoice {
   cgst_amount: number;
   igst_amount: number;
   total: number;
+  total_pieces: number;
   gst_inclusive: boolean;
   payment_method?: string;
   payment_amount?: number;
   status: string;
   notes?: string;
   created_at: string;
+}
+
+interface InvoiceTagSummary {
+  invoice_id: number;
+  invoice_no: string;
+  total_tags: number;
+  printed_tags: number;
+  pending_tags: number;
+  last_printed_at?: string;
 }
 
 interface InvoiceSearchQuery {
@@ -84,6 +95,7 @@ export const InvoiceList: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
+  const [invoiceTagSummaries, setInvoiceTagSummaries] = useState<Map<number, InvoiceTagSummary>>(new Map());
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -127,6 +139,9 @@ export const InvoiceList: React.FC = () => {
       const result = await invoke<Invoice[]>('search_invoices', { query });
       setInvoices(result);
 
+      // Load tag summaries for all invoices
+      await loadTagSummaries(result);
+
       // Calculate total pages (this is a simplified approach)
       setTotalPages(Math.ceil(result.length / itemsPerPage));
     } catch (error) {
@@ -153,6 +168,42 @@ export const InvoiceList: React.FC = () => {
     } catch (error) {
       console.error('Failed to load stores:', error);
     }
+  };
+
+  const loadTagSummaries = async (invoiceList: Invoice[]) => {
+    try {
+      const summaries = new Map<number, InvoiceTagSummary>();
+
+      // Load tag summaries for each invoice
+      const promises = invoiceList.map(async (invoice) => {
+        try {
+          const summary = await invoke<InvoiceTagSummary>('get_invoice_tag_summary', {
+            invoiceId: invoice.id
+          });
+          summaries.set(invoice.id, summary);
+        } catch (error) {
+          console.warn(`Failed to load tag summary for invoice ${invoice.id}:`, error);
+          // Set default values if failed to load
+          summaries.set(invoice.id, {
+            invoice_id: invoice.id,
+            invoice_no: invoice.invoice_no,
+            total_tags: 0,
+            printed_tags: 0,
+            pending_tags: 0,
+          });
+        }
+      });
+
+      await Promise.all(promises);
+      setInvoiceTagSummaries(summaries);
+    } catch (error) {
+      console.error('Failed to load tag summaries:', error);
+    }
+  };
+
+  const handleTagPrintSuccess = (invoiceId: number) => {
+    // Reload tag summary for this specific invoice
+    loadInvoices(); // This will refresh the entire list including tag summaries
   };
 
   const handleStatusUpdate = async () => {
@@ -311,6 +362,16 @@ export const InvoiceList: React.FC = () => {
       ),
     },
     {
+      key: 'pieces',
+      header: 'Pieces',
+      render: (invoice: Invoice) => (
+        <div className="text-center">
+          <div className="font-medium">{invoice.total_pieces}</div>
+          <div className="text-xs text-gray-500">pieces</div>
+        </div>
+      ),
+    },
+    {
       key: 'payment',
       header: 'Payment',
       render: (invoice: Invoice) => {
@@ -377,6 +438,15 @@ export const InvoiceList: React.FC = () => {
           >
             👁️
           </Button>
+          <TagPrintButton
+            invoiceId={invoice.id}
+            tagCount={invoiceTagSummaries.get(invoice.id)?.total_tags || 0}
+            pieceCount={invoice.total_pieces || 0}
+            isPrinted={(invoiceTagSummaries.get(invoice.id)?.printed_tags || 0) > 0}
+            onPrintSuccess={() => handleTagPrintSuccess(invoice.id)}
+            size="sm"
+            variant="icon"
+          />
           <Button
             size="sm"
             variant="ghost"

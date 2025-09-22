@@ -250,6 +250,7 @@ pub struct Invoice {
     pub gst_inclusive: i64,
     pub payment_method: Option<String>,
     pub payment_amount: Option<f64>,
+    pub total_pieces: i32,
     pub status: String,
     pub notes: Option<String>,
     pub created_at: String,
@@ -279,6 +280,7 @@ pub struct CreateInvoiceItemRequest {
     pub variant_id: Option<i64>,
     pub description: Option<String>,
     pub qty: f64,
+    pub piece_count: Option<i32>,
     pub weight_kg: Option<f64>,
     pub area_sqft: Option<f64>,
     pub addons: Option<Vec<CreateInvoiceItemAddonRequest>>,
@@ -298,6 +300,7 @@ pub struct InvoiceItem {
     pub variant_id: Option<i64>,
     pub description: Option<String>,
     pub qty: f64,
+    pub piece_count: i32,
     pub weight_kg: Option<f64>,
     pub area_sqft: Option<f64>,
     pub rate: f64,
@@ -373,6 +376,103 @@ pub struct InvoiceItemWithDetails {
     pub service: Service,
     pub variant: Option<ServiceVariant>,
     pub addons: Vec<InvoiceItemAddonWithDetails>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ClothingTag {
+    pub id: i64,
+    pub invoice_id: i64,
+    pub invoice_item_id: i64,
+    pub tag_number: i64,
+    pub total_quantity: i64,
+    pub overall_piece_number: i64,
+    pub total_invoice_pieces: i64,
+    pub tag_code: String,
+    pub printed_at: Option<String>,
+    pub printed_by: Option<String>,
+    pub reprint_count: i64,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateClothingTagRequest {
+    pub invoice_id: i64,
+    pub invoice_item_id: i64,
+    pub tag_number: i64,
+    pub total_quantity: i64,
+    pub overall_piece_number: i64,
+    pub total_invoice_pieces: i64,
+    pub tag_code: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct TagSettings {
+    pub id: i64,
+    pub store_id: Option<i64>,
+    pub roll_width: String,
+    pub auto_print: i64,
+    pub printer_name: Option<String>,
+    pub template_style: String,
+    pub include_barcode: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateTagSettingsRequest {
+    pub store_id: Option<i64>,
+    pub roll_width: String,
+    pub auto_print: bool,
+    pub printer_name: Option<String>,
+    pub template_style: String,
+    pub include_barcode: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateTagSettingsRequest {
+    pub roll_width: String,
+    pub auto_print: bool,
+    pub printer_name: Option<String>,
+    pub template_style: String,
+    pub include_barcode: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TagPrintRequest {
+    pub invoice_id: i64,
+    pub item_ids: Option<Vec<i64>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TagData {
+    pub invoice_no: String,
+    pub customer_name: String,
+    pub service_name: String,
+    pub addons: Option<String>,
+    pub tag_number: i64,
+    pub total_quantity: i64,
+    pub overall_piece_number: i64,
+    pub total_invoice_pieces: i64,
+    pub delivery_date: Option<String>,
+    pub tag_code: String,
+    pub include_barcode: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TagPrintResponse {
+    pub success: bool,
+    pub message: String,
+    pub tags_printed: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InvoiceTagSummary {
+    pub invoice_id: i64,
+    pub invoice_no: String,
+    pub total_tags: i64,
+    pub printed_tags: i64,
+    pub pending_tags: i64,
+    pub last_printed_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

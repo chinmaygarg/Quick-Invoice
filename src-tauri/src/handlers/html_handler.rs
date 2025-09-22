@@ -3,7 +3,7 @@ use crate::services::html_generator::{
     HtmlGenerator, InvoiceHtmlData, InvoiceItemWithDetails, InvoiceAddonDetail, HtmlTotals
 };
 use sqlx::Row;
-use tauri::{State, AppHandle, Manager, api::shell};
+use tauri::{State, AppHandle, Manager};
 use std::process::Command;
 use std::fs;
 use std::path::PathBuf;
@@ -67,28 +67,16 @@ pub async fn save_and_open_invoice_html(
 
     log::info!("Attempting to open HTML file: {}", file_path);
 
-    // Try shell::open first with direct path
-    match shell::open(&app_handle.shell_scope(), file_path.clone(), None) {
-        Ok(_) => {
-            log::info!("Successfully opened file with shell::open: {}", file_path);
-        }
-        Err(e) => {
-            log::warn!("shell::open failed: {}, trying system open command", e);
+    // Open the file in browser using system command
+    Command::new("open")
+        .arg(&file_path)
+        .spawn()
+        .map_err(|e| ApiError {
+            message: format!("Failed to open HTML file: {}", e),
+            code: Some("BROWSER_OPEN_ERROR".to_string()),
+        })?;
 
-            // Fallback to system open command on macOS
-            Command::new("open")
-                .arg(&file_path)
-                .spawn()
-                .map_err(|cmd_err| ApiError {
-                    message: format!("Failed to open HTML file. shell::open error: {}, open command error: {}", e, cmd_err),
-                    code: Some("BROWSER_OPEN_ERROR".to_string()),
-                })?;
-
-            log::info!("Successfully opened file with system open command: {}", file_path);
-        }
-    }
-
-    log::info!("HTML file opened in browser: {}", file_path);
+    log::info!("Successfully opened HTML file in browser: {}", file_path);
     Ok(file_path)
 }
 
@@ -154,28 +142,16 @@ pub async fn validate_html_output_path(path: String) -> ApiResult<bool> {
 pub async fn open_html_file(file_path: String, app_handle: AppHandle) -> ApiResult<()> {
     log::info!("Attempting to open HTML file: {}", file_path);
 
-    // Try shell::open first with direct path
-    match shell::open(&app_handle.shell_scope(), file_path.clone(), None) {
-        Ok(_) => {
-            log::info!("Successfully opened file with shell::open: {}", file_path);
-        }
-        Err(e) => {
-            log::warn!("shell::open failed: {}, trying system open command", e);
+    // Open the file in browser using system command
+    Command::new("open")
+        .arg(&file_path)
+        .spawn()
+        .map_err(|e| ApiError {
+            message: format!("Failed to open HTML file: {}", e),
+            code: Some("FILE_OPEN_ERROR".to_string()),
+        })?;
 
-            // Fallback to system open command on macOS
-            Command::new("open")
-                .arg(&file_path)
-                .spawn()
-                .map_err(|cmd_err| ApiError {
-                    message: format!("Failed to open HTML file. shell::open error: {}, open command error: {}", e, cmd_err),
-                    code: Some("FILE_OPEN_ERROR".to_string()),
-                })?;
-
-            log::info!("Successfully opened file with system open command: {}", file_path);
-        }
-    }
-
-    log::info!("HTML file opened: {}", file_path);
+    log::info!("Successfully opened HTML file: {}", file_path);
     Ok(())
 }
 
@@ -255,6 +231,7 @@ async fn get_invoice_html_data(
             variant_id: item_row.get("variant_id"),
             description: item_row.get("description"),
             qty: item_row.get("qty"),
+            piece_count: item_row.get("piece_count"),
             weight_kg: item_row.get("weight_kg"),
             area_sqft: item_row.get("area_sqft"),
             rate: item_row.get("rate"),

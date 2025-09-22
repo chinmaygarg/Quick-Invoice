@@ -118,6 +118,9 @@ CREATE TABLE IF NOT EXISTS invoices (
     payment_method TEXT, -- cash, card, upi, bank_transfer, credit, partial
     payment_amount REAL DEFAULT 0,
 
+    -- Piece tracking
+    total_pieces INTEGER DEFAULT 0,
+
     -- Status and tracking
     status TEXT DEFAULT 'pending', -- pending, in-progress, completed, paid, cancelled
     notes TEXT,
@@ -135,6 +138,7 @@ CREATE TABLE IF NOT EXISTS invoice_items (
     variant_id INTEGER REFERENCES service_variants(id), -- optional for dynamic services
     description TEXT,
     qty REAL DEFAULT 1,
+    piece_count INTEGER DEFAULT 1, -- number of individual pieces/garments
     weight_kg REAL,
     area_sqft REAL,
     rate REAL NOT NULL, -- snapshot rate at invoice time
@@ -212,6 +216,44 @@ CREATE INDEX IF NOT EXISTS idx_service_variants_service_id ON service_variants(s
 
 CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity, entity_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_changed_on ON audit_log(changed_on);
+
+-- 13. Clothing tags table
+CREATE TABLE IF NOT EXISTS clothing_tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_id INTEGER NOT NULL REFERENCES invoices(id),
+    invoice_item_id INTEGER NOT NULL REFERENCES invoice_items(id),
+    tag_number INTEGER NOT NULL, -- Service-level piece number (1 of 12)
+    total_quantity INTEGER NOT NULL, -- Total pieces for this service item
+    overall_piece_number INTEGER NOT NULL, -- Overall invoice piece number (1 of 30)
+    total_invoice_pieces INTEGER NOT NULL, -- Total pieces in entire invoice
+    tag_code TEXT NOT NULL, -- Unique tag identifier (UC634-0136-1-3)
+    printed_at TEXT,
+    printed_by TEXT,
+    reprint_count INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(invoice_item_id, tag_number)
+);
+
+-- 14. Tag settings table
+CREATE TABLE IF NOT EXISTS tag_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    store_id INTEGER REFERENCES stores(id),
+    roll_width TEXT DEFAULT '40mm', -- 32mm, 40mm, 50mm
+    auto_print INTEGER DEFAULT 0,
+    printer_name TEXT,
+    template_style TEXT DEFAULT 'standard', -- standard, compact
+    include_barcode INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for clothing tags
+CREATE INDEX IF NOT EXISTS idx_clothing_tags_invoice_id ON clothing_tags(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_clothing_tags_invoice_item_id ON clothing_tags(invoice_item_id);
+CREATE INDEX IF NOT EXISTS idx_clothing_tags_tag_code ON clothing_tags(tag_code);
+CREATE INDEX IF NOT EXISTS idx_clothing_tags_printed_at ON clothing_tags(printed_at);
+
+CREATE INDEX IF NOT EXISTS idx_tag_settings_store_id ON tag_settings(store_id);
 
 -- Triggers for automatic invoice calculation
 CREATE TRIGGER IF NOT EXISTS trg_invoice_items_insert

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {
+            size: 32mm auto;
+            margin: 1mm;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+            font-size: 6px;
+            line-height: 1.2;
+            color: #000;
+        }
+
+        .tag-32mm {
+            width: 30mm;
+            padding: 1mm;
+            box-sizing: border-box;
+            border: 0.5px solid #ddd;
+            page-break-inside: avoid;
+            display: block;
+        }
+
+        .tag-header {
+            font-weight: bold;
+            font-size: 7px;
+            text-align: center;
+            margin-bottom: 1mm;
+            border-bottom: 0.5px solid #eee;
+            padding-bottom: 0.5mm;
+        }
+
+        .tag-customer {
+            font-weight: bold;
+            font-size: 6px;
+            text-align: center;
+            margin-bottom: 0.5mm;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .tag-service {
+            font-size: 5px;
+            text-align: center;
+            margin-bottom: 0.5mm;
+            word-wrap: break-word;
+            line-height: 1.2;
+            font-weight: 600;
+        }
+
+        .tag-addons {
+            font-size: 4px;
+            text-align: center;
+            margin-bottom: 0.5mm;
+            word-wrap: break-word;
+            line-height: 1.1;
+            font-style: italic;
+            color: #333;
+        }
+
+        .tag-service-count {
+            font-weight: bold;
+            font-size: 6px;
+            text-align: center;
+            margin-bottom: 0.5mm;
+        }
+
+        .tag-delivery {
+            font-size: 5px;
+            text-align: center;
+            margin-bottom: 0.5mm;
+        }
+
+
+        @media print {
+            .tag-32mm {
+                page-break-after: always;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="tag-32mm">
+        <div class="tag-header">{{invoice_no}} ({{overall_piece_number}}/{{total_invoice_pieces}})</div>
+        <div class="tag-customer">{{customer_name}}</div>
+        <div class="tag-service">{{service_name_short}}</div>
+        {{#if addons}}<div class="tag-addons">+ {{addons}}</div>{{/if}}
+        <div class="tag-service-count">{{tag_number}} of {{total_quantity}}</div>
+        <div class="tag-delivery">{{delivery_date_short}}</div>
+    </div>
+</body>
+</html>

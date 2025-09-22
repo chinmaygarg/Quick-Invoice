@@ -30,6 +30,7 @@ interface InvoiceItem {
   variantName?: string;
   description?: string;
   quantity: number;
+  pieceCount?: number;
   weight?: number;
   rate: number;
   amount: number;
@@ -247,6 +248,7 @@ export function InvoiceForm() {
           variant_id: item.variantId ?? null,
           description: item.description || null,
           qty: item.quantity,
+          piece_count: item.pieceCount ?? null,
           weight_kg: item.weight ?? null,
           area_sqft: null,
           addons: item.addons.length > 0 ? item.addons.map(addon => ({

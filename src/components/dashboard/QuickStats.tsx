@@ -142,13 +142,13 @@ export function QuickStats() {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">{item.title}</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <div className="text-2xl font-bold text-gray-900">
                   {isLoading ? (
                     <div className="animate-pulse bg-gray-200 h-8 w-16 rounded"></div>
                   ) : (
                     item.value
                   )}
-                </p>
+                </div>
               </div>
             </div>
           </div>
