@@ -153,6 +153,15 @@ export function InvoiceForm() {
     return Object.keys(errors).length === 0;
   }, [formData.customerId, formData.items, formData.discount, formData.discountType]);
 
+  const handlePaymentUpdate = useCallback((payment) => {
+    setFormData(prev => ({
+      ...prev,
+      paymentMethod: payment.method,
+      paymentAmount: payment.amount,
+      notes: payment.notes
+    }));
+  }, []);
+
   const calculateTotals = useMemo(() => {
     const subtotal = formData.items.reduce((sum, item) => {
       const itemTotal = item.amount + item.addons.reduce((addonSum, addon) => addonSum + addon.amount, 0);
@@ -235,10 +244,11 @@ export function InvoiceForm() {
         delivery_datetime: formData.deliveryDate ? `${formData.deliveryDate}T19:00:00` : null,
         items: formData.items.map(item => ({
           service_id: item.serviceId,
-          variant_id: item.variantId,
+          variant_id: item.variantId ?? null,
           description: item.description || null,
           qty: item.quantity,
-          weight_kg: item.weight,
+          weight_kg: item.weight ?? null,
+          area_sqft: null,
           addons: item.addons.length > 0 ? item.addons.map(addon => ({
             addon_id: addon.addonId,
             qty: addon.quantity,
@@ -248,10 +258,11 @@ export function InvoiceForm() {
         discount_type: formData.discountType,
         express_charge: formData.expressCharge,
         gst_inclusive: formData.gstInclusive,
-        payment_method: formData.paymentMethod,
-        payment_amount: formData.paymentAmount,
+        payment_method: formData.paymentMethod ?? null,
+        payment_amount: formData.paymentAmount ?? null,
         notes: formData.notes,
       };
+
 
       let invoice;
       if (id && id !== 'new') {
@@ -418,12 +429,7 @@ export function InvoiceForm() {
           {currentStep === 3 && (
             <PaymentSection
               totalAmount={calculateTotal}
-              onPaymentUpdate={(payment) => setFormData(prev => ({
-                ...prev,
-                paymentMethod: payment.method,
-                paymentAmount: payment.amount,
-                notes: payment.notes
-              }))}
+              onPaymentUpdate={handlePaymentUpdate}
               initialPayment={{
                 method: formData.paymentMethod || 'cash',
                 amount: formData.paymentAmount || calculateTotal,

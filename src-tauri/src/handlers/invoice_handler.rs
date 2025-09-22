@@ -202,7 +202,7 @@ pub async fn create_invoice(
             })?;
 
             let addon_rate: f64 = addon_row.get("price");
-            let addon_gst_rate: f64 = addon_row.get("gst_rate");
+            let addon_gst_rate: f64 = gst_rate; // Use parent service's GST rate
 
             let addon_pricing = PricingEngine::calculate_simple_pricing(
                 addon_rate,
@@ -217,8 +217,8 @@ pub async fn create_invoice(
             sqlx::query(
                 r#"
                 INSERT INTO invoice_item_addons (
-                    invoice_item_id, addon_id, qty, rate, amount, gst_rate, sgst, cgst
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    invoice_item_id, addon_id, qty, rate, amount
+                ) VALUES (?, ?, ?, ?, ?)
                 "#
             )
             .bind(item_id)
@@ -226,9 +226,6 @@ pub async fn create_invoice(
             .bind(addon_request.qty)
             .bind(addon_rate)
             .bind(addon_pricing.line_total)
-            .bind(addon_gst_rate)
-            .bind(addon_pricing.sgst_amount)
-            .bind(addon_pricing.cgst_amount)
             .execute(&mut *tx)
             .await
             .map_err(|e| ApiError {
@@ -274,6 +271,12 @@ pub async fn create_invoice(
         message: format!("Transaction commit failed: {}", e),
         code: Some("COMMIT_ERROR".to_string()),
     })?;
+
+    // Auto-generate tags for the invoice
+    if let Err(e) = crate::services::TagGeneratorService::generate_tags_for_invoice(&state.db, invoice_id).await {
+        log::warn!("Failed to generate tags for invoice {}: {}", invoice_id, e);
+        // Don't fail the invoice creation if tag generation fails
+    }
 
     // Return the created invoice with full details
     get_invoice_by_id(state, invoice_id).await

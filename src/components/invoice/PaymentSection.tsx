@@ -48,7 +48,7 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({
       amount: paymentAmount,
       notes: paymentNotes,
     });
-  }, [paymentMethod, paymentAmount, paymentNotes, onPaymentUpdate]);
+  }, [paymentMethod, paymentAmount, paymentNotes]);
 
   const balance = totalAmount - paymentAmount;
   const isFullPayment = Math.abs(balance) < 0.01;
