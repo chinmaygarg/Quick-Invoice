@@ -254,21 +254,33 @@ impl TagGeneratorService {
 
     fn format_delivery_date(datetime_str: &str) -> String {
         // Parse and format delivery date for tag display
-        // Expected format: 2025-09-24 19:00:00 -> 24/09 7-9PM
-        if let Ok(datetime) = chrono::NaiveDateTime::parse_from_str(datetime_str, "%Y-%m-%d %H:%M:%S") {
-            let date_part = datetime.format("%d/%m").to_string();
-            let hour = datetime.hour();
+        // Expected formats: 2025-09-24T19:30:00 or 2025-09-24 19:30:00 -> 24/09/2025 07:30 PM
 
-            // Assume 2-hour window for delivery
-            let start_hour = if hour > 12 { hour - 12 } else { hour };
-            let end_hour = start_hour + 2;
-            let period = if hour >= 12 { "PM" } else { "AM" };
-
-            format!("{} {}-{}PM", date_part, start_hour, end_hour)
+        // Try ISO format with T separator first
+        let datetime = if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(datetime_str, "%Y-%m-%dT%H:%M:%S") {
+            dt
+        } else if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(datetime_str, "%Y-%m-%d %H:%M:%S") {
+            dt
         } else {
-            // Fallback to original string
-            datetime_str.to_string()
-        }
+            // Fallback to original string if neither format works
+            return datetime_str.to_string();
+        };
+
+        let date_part = datetime.format("%d/%m/%Y").to_string();
+        let hour = datetime.hour();
+        let minute = datetime.minute();
+
+        let (hour_12, period) = if hour == 0 {
+            (12, "AM")
+        } else if hour < 12 {
+            (hour, "AM")
+        } else if hour == 12 {
+            (12, "PM")
+        } else {
+            (hour - 12, "PM")
+        };
+
+        format!("{} {:02}:{:02} {}", date_part, hour_12, minute, period)
     }
 
     async fn get_invoice_with_details(

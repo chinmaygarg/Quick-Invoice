@@ -343,16 +343,16 @@ export function CustomerSelector({
             </div>
 
             <div>
-              <label htmlFor="delivery-date" className="form-label">
-                Delivery Date
+              <label htmlFor="delivery-datetime" className="form-label">
+                Delivery Date & Time
               </label>
               <input
-                id="delivery-date"
-                type="date"
+                id="delivery-datetime"
+                type="datetime-local"
                 value={deliveryDate}
                 onChange={(e) => onDeliveryDateChange(e.target.value)}
                 className="form-input"
-                data-testid="delivery-date"
+                data-testid="delivery-datetime"
               />
             </div>
           </div>

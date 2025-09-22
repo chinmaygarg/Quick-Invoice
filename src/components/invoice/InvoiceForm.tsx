@@ -81,12 +81,13 @@ export function InvoiceForm() {
         sessionStorage.removeItem('quick-selected-customer');
       }
 
-      // Set default delivery date (day after tomorrow)
+      // Set default delivery date (day after tomorrow at 7 PM)
       const defaultDeliveryDate = new Date();
       defaultDeliveryDate.setDate(defaultDeliveryDate.getDate() + 2);
+      defaultDeliveryDate.setHours(19, 0, 0, 0); // Set to 7:00 PM
       setFormData(prev => ({
         ...prev,
-        deliveryDate: defaultDeliveryDate.toISOString().split('T')[0],
+        deliveryDate: defaultDeliveryDate.toISOString().slice(0, 16), // Format for datetime-local
       }));
     }
   }, [id]);
@@ -101,7 +102,7 @@ export function InvoiceForm() {
         customerId: invoice.customer_id,
         storeId: invoice.store_id,
         orderSource: invoice.order_source,
-        deliveryDate: invoice.delivery_datetime?.split('T')[0] || '',
+        deliveryDate: invoice.delivery_datetime ? invoice.delivery_datetime.slice(0, 16) : '',
         items: invoice.items || [],
         discount: invoice.discount || 0,
         discountType: invoice.discount_type || 'flat',
@@ -242,7 +243,7 @@ export function InvoiceForm() {
         customer_id: formData.customerId,
         store_id: formData.storeId,
         order_source: formData.orderSource,
-        delivery_datetime: formData.deliveryDate ? `${formData.deliveryDate}T19:00:00` : null,
+        delivery_datetime: formData.deliveryDate ? `${formData.deliveryDate}:00` : null,
         items: formData.items.map(item => ({
           service_id: item.serviceId,
           variant_id: item.variantId ?? null,
