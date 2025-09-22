@@ -5,6 +5,7 @@ interface InvoiceItem {
   serviceName: string;
   variantName?: string;
   quantity: number;
+  originalQuantity?: number;
   rate: number;
   amount: number;
   addons: InvoiceItemAddon[];
@@ -153,6 +154,11 @@ export function InvoiceSummary({
                       </p>
                       <p className="text-gray-600">
                         {item.quantity} × {formatCurrency(item.rate)}
+                        {item.originalQuantity && (
+                          <span className="text-xs text-orange-600 block">
+                            (Minimum {item.quantity}kg applied, you entered {item.originalQuantity}kg)
+                          </span>
+                        )}
                       </p>
                       {item.addons.length > 0 && (
                         <div className="mt-1 pl-2 border-l-2 border-gray-200">

@@ -7,7 +7,7 @@ interface Service {
   name: string;
   unit: string;
   base_price: number;
-  min_qty: number;
+  min_quantity: number;
   gst_rate: number;
   is_dynamic: number;
   hsn_sac_code?: string;
@@ -42,6 +42,7 @@ interface InvoiceItem {
   variantName?: string;
   description?: string;
   quantity: number;
+  originalQuantity?: number;
   pieceCount?: number;
   weight?: number;
   rate: number;
@@ -163,8 +164,8 @@ export function ServiceSelector({
 
   const calculateAmount = () => {
     const rate = getCurrentRate();
-    const effectiveQuantity = selectedService && quantity < selectedService.min_qty
-      ? selectedService.min_qty
+    const effectiveQuantity = selectedService && quantity < selectedService.min_quantity
+      ? selectedService.min_quantity
       : quantity;
     return rate * effectiveQuantity;
   };
@@ -214,12 +215,17 @@ export function ServiceSelector({
       return;
     }
 
+    const effectiveQuantity = selectedService && quantity < selectedService.min_quantity
+      ? selectedService.min_quantity
+      : quantity;
+
     const item: Omit<InvoiceItem, 'id'> = {
       serviceId: selectedService.id,
       variantId: selectedVariant?.id,
       serviceName: selectedService.name,
       variantName: selectedVariant?.variant_name,
-      quantity,
+      quantity: effectiveQuantity,
+      originalQuantity: selectedService && quantity < selectedService.min_quantity ? quantity : undefined,
       pieceCount,
       rate: getCurrentRate(),
       amount: calculateAmount(),
@@ -308,6 +314,11 @@ export function ServiceSelector({
                       <div className="mt-1 text-sm text-gray-600">
                         <span data-testid={`service-quantity-${index}`}>
                           Quantity: {item.quantity}
+                          {item.originalQuantity && (
+                            <span className="text-orange-600 text-xs ml-1">
+                              (min applied, entered {item.originalQuantity})
+                            </span>
+                          )}
                         </span>
                         {item.pieceCount && (
                           <>
@@ -410,9 +421,9 @@ export function ServiceSelector({
                             <p className="text-sm text-gray-600">
                               {formatCurrency(service.base_price)} per {service.unit}
                             </p>
-                            {service.min_qty > 0 && (
+                            {service.min_quantity > 0 && (
                               <p className="text-xs text-orange-600">
-                                Min: {service.min_qty} {service.unit}
+                                Min: {service.min_quantity} {service.unit}
                               </p>
                             )}
                           </button>
@@ -468,9 +479,9 @@ export function ServiceSelector({
                         className="form-input"
                         data-testid="service-quantity"
                       />
-                      {selectedService.min_qty > 0 && quantity < selectedService.min_qty && (
+                      {selectedService.min_quantity > 0 && quantity < selectedService.min_quantity && (
                         <p className="form-help text-orange-600" data-testid="min-quantity-warning">
-                          Minimum quantity is {selectedService.min_qty}{selectedService.unit}. You will be charged for {selectedService.min_qty}{selectedService.unit}.
+                          Minimum quantity is {selectedService.min_quantity}{selectedService.unit}. You will be charged for {selectedService.min_quantity}{selectedService.unit}.
                         </p>
                       )}
                     </div>
