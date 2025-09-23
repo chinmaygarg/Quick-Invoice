@@ -399,7 +399,7 @@ async fn generate_tags_html(app_handle: &AppHandle, tag_data: &[TagData], roll_w
     // Read template
     let template_content = tokio::fs::read_to_string(template_path)
         .await
-        .context("Failed to read tag template")?;
+        .context(format!("Failed to read tag template from: {}", template_path.display()))?;
 
     // Generate HTML for each tag
     for (index, tag) in tag_data.iter().enumerate() {
