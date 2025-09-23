@@ -3,7 +3,7 @@ use crate::services::html_generator::{
     HtmlGenerator, InvoiceHtmlData, InvoiceItemWithDetails, InvoiceAddonDetail, HtmlTotals
 };
 use sqlx::Row;
-use tauri::{State, AppHandle, Manager, api::shell};
+use tauri::{State, AppHandle, Manager};
 use std::process::Command;
 use std::fs;
 use std::path::PathBuf;
@@ -103,7 +103,7 @@ pub async fn save_and_open_invoice_html(
         }
     }
 
-    log::info!("HTML file opened in browser: {}", file_path);
+    log::info!("Successfully opened HTML file in browser: {}", file_path);
     Ok(file_path)
 }
 
@@ -205,7 +205,7 @@ pub async fn open_html_file(file_path: String, app_handle: AppHandle) -> ApiResu
         }
     }
 
-    log::info!("HTML file opened: {}", file_path);
+    log::info!("Successfully opened HTML file: {}", file_path);
     Ok(())
 }
 
@@ -285,6 +285,7 @@ async fn get_invoice_html_data(
             variant_id: item_row.get("variant_id"),
             description: item_row.get("description"),
             qty: item_row.get("qty"),
+            piece_count: item_row.get("piece_count"),
             weight_kg: item_row.get("weight_kg"),
             area_sqft: item_row.get("area_sqft"),
             rate: item_row.get("rate"),

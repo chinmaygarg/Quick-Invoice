@@ -94,6 +94,7 @@ pub async fn create_invoice(
     let mut subtotal = 0.0;
     let mut total_sgst = 0.0;
     let mut total_cgst = 0.0;
+    let mut total_pieces = 0i32;
 
     // Process each invoice item
     for item_request in request.items {
@@ -150,13 +151,16 @@ pub async fn create_invoice(
             request.gst_inclusive.unwrap_or(false),
         )?;
 
+        // Calculate piece count (default to qty if not provided)
+        let piece_count = item_request.piece_count.unwrap_or(item_request.qty as i32);
+
         // Insert invoice item
         let item_id = sqlx::query(
             r#"
             INSERT INTO invoice_items (
-                invoice_id, service_id, variant_id, description, qty, weight_kg, area_sqft,
+                invoice_id, service_id, variant_id, description, qty, piece_count, weight_kg, area_sqft,
                 rate, amount, gst_rate, sgst, cgst
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#
         )
         .bind(invoice_id)
@@ -164,6 +168,7 @@ pub async fn create_invoice(
         .bind(item_request.variant_id)
         .bind(item_request.description.as_deref())
         .bind(item_request.qty)
+        .bind(piece_count)
         .bind(item_request.weight_kg)
         .bind(item_request.area_sqft)
         .bind(variant_rate)
@@ -182,6 +187,7 @@ pub async fn create_invoice(
         subtotal += pricing.subtotal;
         total_sgst += pricing.sgst_amount;
         total_cgst += pricing.cgst_amount;
+        total_pieces += piece_count;
 
         // Process addons for this item
         if let Some(addons) = &item_request.addons {
@@ -202,7 +208,7 @@ pub async fn create_invoice(
             })?;
 
             let addon_rate: f64 = addon_row.get("price");
-            let addon_gst_rate: f64 = addon_row.get("gst_rate");
+            let addon_gst_rate: f64 = gst_rate; // Use parent service's GST rate
 
             let addon_pricing = PricingEngine::calculate_simple_pricing(
                 addon_rate,
@@ -217,8 +223,8 @@ pub async fn create_invoice(
             sqlx::query(
                 r#"
                 INSERT INTO invoice_item_addons (
-                    invoice_item_id, addon_id, qty, rate, amount, gst_rate, sgst, cgst
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    invoice_item_id, addon_id, qty, rate, amount
+                ) VALUES (?, ?, ?, ?, ?)
                 "#
             )
             .bind(item_id)
@@ -226,9 +232,6 @@ pub async fn create_invoice(
             .bind(addon_request.qty)
             .bind(addon_rate)
             .bind(addon_pricing.line_total)
-            .bind(addon_gst_rate)
-            .bind(addon_pricing.sgst_amount)
-            .bind(addon_pricing.cgst_amount)
             .execute(&mut *tx)
             .await
             .map_err(|e| ApiError {
@@ -253,7 +256,8 @@ pub async fn create_invoice(
             subtotal = ?,
             sgst_amount = ?,
             cgst_amount = ?,
-            total = ?
+            total = ?,
+            total_pieces = ?
         WHERE id = ?
         "#
     )
@@ -261,6 +265,7 @@ pub async fn create_invoice(
     .bind(total_sgst)
     .bind(total_cgst)
     .bind(final_total)
+    .bind(total_pieces)
     .bind(invoice_id)
     .execute(&mut *tx)
     .await
@@ -274,6 +279,12 @@ pub async fn create_invoice(
         message: format!("Transaction commit failed: {}", e),
         code: Some("COMMIT_ERROR".to_string()),
     })?;
+
+    // Auto-generate tags for the invoice
+    if let Err(e) = crate::services::TagGeneratorService::generate_tags_for_invoice(&state.db, invoice_id).await {
+        log::warn!("Failed to generate tags for invoice {}: {}", invoice_id, e);
+        // Don't fail the invoice creation if tag generation fails
+    }
 
     // Return the created invoice with full details
     get_invoice_by_id(state, invoice_id).await
@@ -360,6 +371,7 @@ pub async fn get_invoice_by_id(
             variant_id: row.get("variant_id"),
             description: row.get("description"),
             qty: row.get("qty"),
+            piece_count: row.get("piece_count"),
             weight_kg: row.get("weight_kg"),
             area_sqft: row.get("area_sqft"),
             rate: row.get("rate"),

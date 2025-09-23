@@ -5,3 +5,4 @@ pub mod store_handler;
 pub mod report_handler;
 pub mod pricing_handler;
 pub mod html_handler;
+pub mod tag_handler;

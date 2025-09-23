@@ -19,6 +19,7 @@ use handlers::{
     report_handler,
     pricing_handler,
     html_handler,
+    tag_handler,
 };
 
 // Application state
@@ -120,6 +121,15 @@ async fn main() {
             report_handler::get_customer_summary,
             report_handler::get_service_popularity,
             report_handler::get_express_delivery_summary,
+
+            // Tag operations
+            tag_handler::generate_invoice_tags,
+            tag_handler::print_invoice_tags,
+            tag_handler::get_invoice_tags,
+            tag_handler::get_invoice_tag_summary,
+            tag_handler::get_tag_settings,
+            tag_handler::save_tag_settings,
+            tag_handler::get_tag_preview,
 
             // Utility operations
             initialize_database,

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {
+            size: 50mm auto;
+            margin: 1.5mm;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #000;
+        }
+
+        .tag-50mm {
+            width: 47mm;
+            padding: 1.5mm;
+            box-sizing: border-box;
+            border: 0.5px solid #ddd;
+            page-break-inside: avoid;
+            display: block;
+            margin-bottom: 10mm;
+        }
+
+        .tag-header {
+            font-weight: bold;
+            font-size: 14px;
+            text-align: center;
+            margin-bottom: 1.5mm;
+            border-bottom: 0.5px solid #eee;
+            padding-bottom: 1mm;
+        }
+
+        .tag-customer {
+            font-weight: bold;
+            font-size: 13px;
+            text-align: center;
+            margin-bottom: 1.5mm;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .tag-service {
+            font-size: 11px;
+            text-align: center;
+            margin-bottom: 1mm;
+            word-wrap: break-word;
+            line-height: 1.3;
+            font-weight: 600;
+        }
+
+        .tag-addons {
+            font-size: 9px;
+            text-align: center;
+            margin-bottom: 1.5mm;
+            word-wrap: break-word;
+            line-height: 1.2;
+            font-style: italic;
+            color: #333;
+        }
+
+        .tag-service-count {
+            font-weight: bold;
+            font-size: 13px;
+            text-align: center;
+            margin-bottom: 1.5mm;
+            background: #f0f0f0;
+            padding: 1mm;
+            border-radius: 2mm;
+        }
+
+        .tag-delivery {
+            font-size: 9px;
+            text-align: center;
+            margin-bottom: 1.5mm;
+        }
+
+
+        .tag-footer {
+            font-size: 7px;
+            text-align: center;
+            color: #999;
+            margin-top: 1mm;
+            border-top: 0.5px solid #eee;
+            padding-top: 0.5mm;
+        }
+
+        @media print {
+            .tag-50mm {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="tag-50mm">
+        <div class="tag-header">{{invoice_no}} ({{overall_piece_number}}/{{total_invoice_pieces}})</div>
+        <div class="tag-customer">{{customer_name}}</div>
+        <div class="tag-service">{{service_name}}</div>
+        {{#if addons}}<div class="tag-addons">+ {{addons}}</div>{{/if}}
+        <div class="tag-service-count">{{tag_number}} of {{total_quantity}}</div>
+        <div class="tag-delivery">{{delivery_date}}</div>
+        <div class="tag-footer">UCLEAN</div>
+    </div>
+
+    <script>
+    // Auto-open print dialog when page loads
+    window.addEventListener('load', () => {
+        // Small delay to ensure content is fully rendered
+        setTimeout(() => {
+            window.print();
+        }, 500);
+    });
+    </script>
+</body>
+</html>

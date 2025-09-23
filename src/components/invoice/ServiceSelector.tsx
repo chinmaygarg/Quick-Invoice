@@ -7,7 +7,7 @@ interface Service {
   name: string;
   unit: string;
   base_price: number;
-  min_qty: number;
+  min_quantity: number;
   gst_rate: number;
   is_dynamic: number;
   hsn_sac_code?: string;
@@ -42,6 +42,8 @@ interface InvoiceItem {
   variantName?: string;
   description?: string;
   quantity: number;
+  originalQuantity?: number;
+  pieceCount?: number;
   weight?: number;
   rate: number;
   amount: number;
@@ -83,6 +85,7 @@ export function ServiceSelector({
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<ServiceVariant | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [pieceCount, setPieceCount] = useState(1);
   const [selectedAddons, setSelectedAddons] = useState<Record<number, number>>({});
   const [showAddService, setShowAddService] = useState(false);
 
@@ -161,8 +164,8 @@ export function ServiceSelector({
 
   const calculateAmount = () => {
     const rate = getCurrentRate();
-    const effectiveQuantity = selectedService && quantity < selectedService.min_qty
-      ? selectedService.min_qty
+    const effectiveQuantity = selectedService && quantity < selectedService.min_quantity
+      ? selectedService.min_quantity
       : quantity;
     return rate * effectiveQuantity;
   };
@@ -212,12 +215,18 @@ export function ServiceSelector({
       return;
     }
 
+    const effectiveQuantity = selectedService && quantity < selectedService.min_quantity
+      ? selectedService.min_quantity
+      : quantity;
+
     const item: Omit<InvoiceItem, 'id'> = {
       serviceId: selectedService.id,
       variantId: selectedVariant?.id,
       serviceName: selectedService.name,
       variantName: selectedVariant?.variant_name,
-      quantity,
+      quantity: effectiveQuantity,
+      originalQuantity: selectedService && quantity < selectedService.min_quantity ? quantity : undefined,
+      pieceCount,
       rate: getCurrentRate(),
       amount: calculateAmount(),
       gstRate: getCurrentGstRate(),
@@ -230,6 +239,7 @@ export function ServiceSelector({
     setSelectedService(null);
     setSelectedVariant(null);
     setQuantity(1);
+    setPieceCount(1);
     setSelectedAddons({});
     setShowAddService(false);
 
@@ -304,7 +314,20 @@ export function ServiceSelector({
                       <div className="mt-1 text-sm text-gray-600">
                         <span data-testid={`service-quantity-${index}`}>
                           Quantity: {item.quantity}
+                          {item.originalQuantity && (
+                            <span className="text-orange-600 text-xs ml-1">
+                              (min applied, entered {item.originalQuantity})
+                            </span>
+                          )}
                         </span>
+                        {item.pieceCount && (
+                          <>
+                            <span className="mx-2">•</span>
+                            <span data-testid={`service-pieces-${index}`}>
+                              Pieces: {item.pieceCount}
+                            </span>
+                          </>
+                        )}
                         <span className="mx-2">•</span>
                         <span>Rate: {formatCurrency(item.rate)}</span>
                         <span className="mx-2">•</span>
@@ -398,9 +421,9 @@ export function ServiceSelector({
                             <p className="text-sm text-gray-600">
                               {formatCurrency(service.base_price)} per {service.unit}
                             </p>
-                            {service.min_qty > 0 && (
+                            {service.min_quantity > 0 && (
                               <p className="text-xs text-orange-600">
-                                Min: {service.min_qty} {service.unit}
+                                Min: {service.min_quantity} {service.unit}
                               </p>
                             )}
                           </button>
@@ -456,11 +479,35 @@ export function ServiceSelector({
                         className="form-input"
                         data-testid="service-quantity"
                       />
-                      {selectedService.min_qty > 0 && quantity < selectedService.min_qty && (
+                      {selectedService.min_quantity > 0 && quantity < selectedService.min_quantity && (
                         <p className="form-help text-orange-600" data-testid="min-quantity-warning">
-                          Minimum quantity is {selectedService.min_qty}{selectedService.unit}. You will be charged for {selectedService.min_qty}{selectedService.unit}.
+                          Minimum quantity is {selectedService.min_quantity}{selectedService.unit}. You will be charged for {selectedService.min_quantity}{selectedService.unit}.
                         </p>
                       )}
+                    </div>
+                  )}
+
+                  {/* Piece Count Input */}
+                  {selectedService && (
+                    <div>
+                      <label htmlFor="piece-count" className="form-label">
+                        Number of Pieces
+                        <span className="text-gray-500 text-sm ml-1">(for tag generation)</span>
+                      </label>
+                      <input
+                        id="piece-count"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={pieceCount}
+                        onChange={(e) => setPieceCount(Number(e.target.value))}
+                        className="form-input"
+                        data-testid="piece-count"
+                        placeholder="Enter number of individual pieces"
+                      />
+                      <p className="form-help text-gray-600">
+                        How many individual clothing pieces are in this {selectedService.unit} of service? This is used for tag generation.
+                      </p>
                     </div>
                   )}
 
