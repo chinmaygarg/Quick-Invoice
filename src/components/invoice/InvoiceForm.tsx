@@ -288,10 +288,18 @@ export function InvoiceForm() {
       // Navigate to invoice view or list
       navigate(`/invoices`);
     } catch (error) {
+      let errorMessage = 'An unknown error occurred';
+      if (typeof error === 'object' && error !== null && 'message' in error) {
+        errorMessage = (error as { message: string }).message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else {
+        errorMessage = JSON.stringify(error);
+      }
       showNotification({
         type: 'error',
         title: 'Save Failed',
-        message: `Failed to save invoice: ${error}`,
+        message: `Failed to save invoice: ${errorMessage}`,
       });
     } finally {
       setIsSubmitting(false);
