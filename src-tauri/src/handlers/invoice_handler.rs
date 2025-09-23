@@ -66,8 +66,8 @@ pub async fn create_invoice(
         INSERT INTO invoices (
             invoice_no, customer_id, store_id, order_source, order_datetime, delivery_datetime,
             subtotal, discount, discount_type, express_charge, sgst_amount, cgst_amount, igst_amount,
-            total, gst_inclusive, status, notes, payment_method, payment_amount
-        ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, 0, 0, 0, ?, 'pending', ?, ?, ?)
+            total, gst_inclusive, status, notes, payment_method, payment_amount, total_pieces
+        ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, 0, 0, 0, ?, 'pending', ?, ?, ?, ?)
         "#
     )
     .bind(&invoice_no)
@@ -83,6 +83,7 @@ pub async fn create_invoice(
     .bind(request.notes.as_deref())
     .bind(request.payment_method.as_deref())
     .bind(request.payment_amount.unwrap_or(0.0))
+    .bind(0) // Temporary value for total_pieces, will be updated later
     .execute(&mut *tx)
     .await
     .map_err(|e| ApiError {
