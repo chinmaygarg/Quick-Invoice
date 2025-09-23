@@ -390,7 +390,13 @@ async fn generate_tags_html(app_handle: &AppHandle, tag_data: &[TagData], roll_w
         _ => "tag_40mm.html", // Default
     };
 
-    let template_path = app_handle.path_resolver().app_dir().unwrap().join("src-tauri").join("src").join("templates").join("tags").join(template_file_name);
+    let template_path = if cfg!(debug_assertions) {
+        // In development, read directly from the source directory
+        std::env::current_dir().unwrap().join("src").join("templates").join("tags").join(template_file_name)
+    } else {
+        // In production, read from the bundled resources
+        resource_dir.join("templates").join("tags").join(template_file_name)
+    };
 
     log::info!("Attempting to read tag template from: {}", template_path.display());
 
