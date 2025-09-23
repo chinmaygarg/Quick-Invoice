@@ -392,10 +392,13 @@ async fn generate_tags_html(app_handle: &AppHandle, tag_data: &[TagData], roll_w
 
     let template_path = if cfg!(debug_assertions) {
         // In development, read directly from the source directory
-        std::env::current_dir().unwrap().join("src-tauri").join("src").join("templates").join("tags").join(template_file_name)
+        std::env::current_dir().unwrap().join("src").join("templates").join("tags").join(template_file_name)
     } else {
         // In production, read from the bundled resources
-        resource_dir.join("templates").join("tags").join(template_file_name)
+        tauri::api::path::resolve_resource(
+            &app_handle.path_resolver(),
+            &format!("templates/tags/{}", template_file_name)
+        ).map_err(|e| anyhow::anyhow!("Failed to resolve resource path: {}", e))?
     };
 
     let mut html_content = String::new();
