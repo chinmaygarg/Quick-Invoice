@@ -21,7 +21,7 @@ interface TagSettings {
 interface UpdateTagSettingsRequest {
   roll_width: string;
   auto_print: boolean;
-  printer_name?: string;
+  printer_name: string | null;
   template_style: string;
   include_barcode: boolean;
 }
@@ -57,15 +57,15 @@ export const TagSettings: React.FC = () => {
     try {
       setLoading(true);
       const result = await invoke<TagSettings>('get_tag_settings', {
-        storeId: null, // Global settings for now
+        store_id: null, // Global settings for now
       });
 
       setSettings(result);
       setRollWidth(result.roll_width);
-      setAutoPrint(result.auto_print);
+      setAutoPrint(Boolean(result.auto_print));
       setPrinterName(result.printer_name || '');
       setTemplateStyle(result.template_style);
-      setIncludeBarcode(result.include_barcode);
+      setIncludeBarcode(Boolean(result.include_barcode));
     } catch (error) {
       console.error('Failed to load tag settings:', error);
       toast.error('Failed to load tag settings');
@@ -81,16 +81,15 @@ export const TagSettings: React.FC = () => {
       const request: UpdateTagSettingsRequest = {
         roll_width: rollWidth,
         auto_print: autoPrint,
-        printer_name: printerName || null,
+        printer_name: printerName || "",
         template_style: templateStyle,
         include_barcode: includeBarcode,
       };
 
       const result = await invoke<TagSettings>('save_tag_settings', {
-        storeId: null, // Global settings for now
+        store_id: null, // Global settings for now
         request,
       });
-
       setSettings(result);
       toast.success('Tag settings saved successfully');
     } catch (error) {
@@ -104,10 +103,10 @@ export const TagSettings: React.FC = () => {
   const handleReset = () => {
     if (settings) {
       setRollWidth(settings.roll_width);
-      setAutoPrint(settings.auto_print);
+      setAutoPrint(Boolean(settings.auto_print));
       setPrinterName(settings.printer_name || '');
       setTemplateStyle(settings.template_style);
-      setIncludeBarcode(settings.include_barcode);
+      setIncludeBarcode(Boolean(settings.include_barcode));
     }
   };
 
@@ -236,7 +235,7 @@ export const TagSettings: React.FC = () => {
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               {saving ? (
                 <>

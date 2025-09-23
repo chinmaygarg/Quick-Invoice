@@ -179,27 +179,26 @@ pub async fn save_tag_settings(
 ) -> Result<TagSettings, String> {
     let state = app_handle.state::<crate::AppState>();
 
-    // Check if settings exist for this store
-    let existing_settings = get_tag_settings_internal(&state.db, store_id).await.ok();
+    // Check if settings actually exist in the database
+    let settings_exist = check_tag_settings_exist(&state.db, store_id).await.map_err(|e| {
+        log::error!("Failed to check tag settings existence: {}", e);
+        format!("Failed to check tag settings existence: {}", e)
+    })?;
 
-    if let Some(existing) = existing_settings {
-        if existing.id > 0 {
-            // Update existing settings
-            update_tag_settings_internal(&state.db, existing.id, &request)
-                .await
-                .map_err(|e| {
-                    log::error!("Failed to update tag settings: {}", e);
-                    format!("Failed to update tag settings: {}", e)
-                })?;
-        } else {
-            // Create new settings
-            create_tag_settings_internal(&state.db, store_id, &request)
-                .await
-                .map_err(|e| {
-                    log::error!("Failed to create tag settings: {}", e);
-                    format!("Failed to create tag settings: {}", e)
-                })?;
-        }
+    if settings_exist {
+        // Get existing settings to get the ID for update
+        let existing = get_tag_settings_internal(&state.db, store_id).await.map_err(|e| {
+            log::error!("Failed to get existing tag settings: {}", e);
+            format!("Failed to get existing tag settings: {}", e)
+        })?;
+
+        // Update existing settings
+        update_tag_settings_internal(&state.db, existing.id, &request)
+            .await
+            .map_err(|e| {
+                log::error!("Failed to update tag settings: {}", e);
+                format!("Failed to update tag settings: {}", e)
+            })?;
     } else {
         // Create new settings
         create_tag_settings_internal(&state.db, store_id, &request)
@@ -250,6 +249,34 @@ pub async fn get_tag_preview(
 }
 
 // Internal helper functions
+
+async fn check_tag_settings_exist(
+    db: &DatabaseManager,
+    store_id: Option<i64>,
+) -> Result<bool> {
+    let query = if let Some(store_id) = store_id {
+        "SELECT COUNT(*) as count FROM tag_settings WHERE store_id = ?"
+    } else {
+        "SELECT COUNT(*) as count FROM tag_settings WHERE store_id IS NULL"
+    };
+
+    let result = if let Some(store_id) = store_id {
+        sqlx::query(query).bind(store_id).fetch_one(db.get_pool()).await
+    } else {
+        sqlx::query(query).fetch_one(db.get_pool()).await
+    };
+
+    match result {
+        Ok(row) => {
+            let count: i64 = row.get("count");
+            Ok(count > 0)
+        }
+        Err(e) => {
+            log::error!("Database query failed: {}", e);
+            Err(anyhow::anyhow!("Failed to check tag settings existence: {}", e))
+        }
+    }
+}
 
 async fn get_tag_settings_internal(
     db: &DatabaseManager,
@@ -428,11 +455,6 @@ async fn generate_tags_html(tag_data: &[TagData], roll_width: &str) -> Result<St
         }
 
         html_content.push_str(&tag_html);
-
-        // Add page break except for last tag
-        if index < tag_data.len() - 1 {
-            html_content.push_str("\n<div style='page-break-after: always;'></div>\n");
-        }
     }
 
     Ok(html_content)

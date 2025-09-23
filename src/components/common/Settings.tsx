@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { save, open } from '@tauri-apps/api/dialog';
 import { useApp } from '@/contexts/AppContext';
+import { TagSettings } from '../settings/TagSettings';
 
 export function Settings() {
   const { showNotification, setLoading } = useApp();
@@ -270,6 +271,9 @@ export function Settings() {
           </div>
         </div>
       </div>
+
+      {/* Tag Printing Settings */}
+      <TagSettings />
     </div>
   );
 }
