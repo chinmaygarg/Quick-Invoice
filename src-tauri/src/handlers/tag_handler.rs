@@ -239,7 +239,7 @@ pub async fn get_tag_preview(
 
     let width = roll_width.unwrap_or_else(|| "40mm".to_string());
 
-    generate_tags_html(&tag_data, &width)
+    generate_tags_html(&app_handle, &tag_data, &width)
         .await
         .map_err(|e| {
             log::error!("Failed to generate preview HTML: {}", e);
