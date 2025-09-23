@@ -397,7 +397,7 @@ async fn generate_tags_html(app_handle: &AppHandle, tag_data: &[TagData], roll_w
     let mut html_content = String::new();
 
     // Read template
-    let template_content = tokio::fs::read_to_string(template_path)
+    let template_content = tokio::fs::read_to_string(template_path.clone())
         .await
         .context(format!("Failed to read tag template from: {}", template_path.display()))?;
 
