@@ -395,8 +395,7 @@ async fn generate_tags_html(app_handle: &AppHandle, tag_data: &[TagData], roll_w
         std::env::current_dir().unwrap().join("src").join("templates").join("tags").join(template_file_name)
     } else {
         // In production, read from the bundled resources
-        tauri::api::path::resolve_resource(
-            &app_handle.path_resolver(),
+        app_handle.path_resolver().resolve_resource(
             &format!("templates/tags/{}", template_file_name)
         ).map_err(|e| anyhow::anyhow!("Failed to resolve resource path: {}", e))?
     };
