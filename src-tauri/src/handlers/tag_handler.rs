@@ -396,7 +396,7 @@ async fn generate_tags_html(app_handle: &AppHandle, tag_data: &[TagData], roll_w
     } else {
         // In production, read from the bundled resources
         app_handle.path_resolver().resolve_resource(
-            &format!("templates/tags/{}", template_file_name)
+            &format!("src/templates/tags/{}", template_file_name)
         ).ok_or_else(|| anyhow::anyhow!("Failed to resolve resource path: Resource not found"))?
     };
 
