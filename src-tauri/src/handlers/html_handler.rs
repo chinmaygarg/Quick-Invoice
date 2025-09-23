@@ -7,6 +7,7 @@ use tauri::{State, AppHandle, Manager};
 use std::process::Command;
 use std::fs;
 use std::path::PathBuf;
+use tauri::api::shell;
 
 #[tauri::command]
 pub async fn save_invoice_html_a5(
