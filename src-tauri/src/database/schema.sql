@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS invoice_items (
     variant_id INTEGER REFERENCES service_variants(id), -- optional for dynamic services
     description TEXT,
     qty REAL DEFAULT 1,
-    piece_count INTEGER DEFAULT 1, -- number of individual pieces/garments
+    piece_count INTEGER DEFAULT 0, -- number of individual pieces/garments
     weight_kg REAL,
     area_sqft REAL,
     rate REAL NOT NULL, -- snapshot rate at invoice time
@@ -367,4 +367,44 @@ BEGIN
             json_object('status', OLD.status, 'total', OLD.total),
             json_object('status', NEW.status, 'total', NEW.total)
     );
+END;
+
+-- Triggers for updating total_pieces in invoices
+CREATE TRIGGER IF NOT EXISTS trg_update_invoice_total_pieces
+AFTER INSERT ON invoice_items
+FOR EACH ROW
+BEGIN
+    UPDATE invoices
+    SET total_pieces = (
+        SELECT COALESCE(SUM(piece_count), 0)
+        FROM invoice_items
+        WHERE invoice_id = NEW.invoice_id
+    )
+    WHERE id = NEW.invoice_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_update_invoice_total_pieces_on_update
+AFTER UPDATE ON invoice_items
+FOR EACH ROW
+BEGIN
+    UPDATE invoices
+    SET total_pieces = (
+        SELECT COALESCE(SUM(piece_count), 0)
+        FROM invoice_items
+        WHERE invoice_id = NEW.invoice_id
+    )
+    WHERE id = NEW.invoice_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_update_invoice_total_pieces_on_delete
+AFTER DELETE ON invoice_items
+FOR EACH ROW
+BEGIN
+    UPDATE invoices
+    SET total_pieces = (
+        SELECT COALESCE(SUM(piece_count), 0)
+        FROM invoice_items
+        WHERE invoice_id = OLD.invoice_id
+    )
+    WHERE id = OLD.invoice_id;
 END;
