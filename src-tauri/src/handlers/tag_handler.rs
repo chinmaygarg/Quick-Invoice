@@ -392,6 +392,8 @@ async fn generate_tags_html(app_handle: &AppHandle, tag_data: &[TagData], roll_w
 
     let template_path = resource_dir.join("templates").join("tags").join(template_file_name);
 
+    log::info!("Attempting to read tag template from: {}", template_path.display());
+
     let mut html_content = String::new();
 
     // Read template
