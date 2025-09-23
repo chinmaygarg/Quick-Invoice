@@ -78,7 +78,6 @@
         "providerShortName": null,
         "signingIdentity": null
       },
-      "resources": [],
       "resources": ["src/templates/**"],
       "shortDescription": "UCLEAN Invoice Generation System",
       "targets": "all",
