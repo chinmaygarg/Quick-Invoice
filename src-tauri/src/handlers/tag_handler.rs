@@ -88,11 +88,10 @@ pub async fn print_invoice_tags(
     })?;
 
     // Generate HTML for printing
-    let html_content = generate_tags_html(&tag_data, &settings.roll_width).await.map_err(|e| {
+    let html_content = generate_tags_html(&app_handle, &tag_data, &settings.roll_width).await.map_err(|e| {
         log::error!("Failed to generate tags HTML: {}", e);
         format!("Failed to generate tags HTML: {}", e)
     })?;
-
     // Print the tags (using the existing HTML print mechanism)
     match print_tags_html(&app_handle, &html_content).await {
         Ok(_) => {
@@ -379,13 +378,19 @@ async fn update_tag_settings_internal(
     Ok(())
 }
 
-async fn generate_tags_html(tag_data: &[TagData], roll_width: &str) -> Result<String> {
-    let template_path = match roll_width {
-        "32mm" => "src/templates/tags/tag_32mm.html",
-        "40mm" => "src/templates/tags/tag_40mm.html",
-        "50mm" => "src/templates/tags/tag_50mm.html",
-        _ => "src/templates/tags/tag_40mm.html", // Default
+async fn generate_tags_html(app_handle: &AppHandle, tag_data: &[TagData], roll_width: &str) -> Result<String> {
+    let resource_dir = app_handle.path_resolver().resource_dir().ok_or_else(|| {
+        anyhow::anyhow!("Failed to get resource directory")
+    })?;
+
+    let template_file_name = match roll_width {
+        "32mm" => "tag_32mm.html",
+        "40mm" => "tag_40mm.html",
+        "50mm" => "tag_50mm.html",
+        _ => "tag_40mm.html", // Default
     };
+
+    let template_path = resource_dir.join("templates").join("tags").join(template_file_name);
 
     let mut html_content = String::new();
 
