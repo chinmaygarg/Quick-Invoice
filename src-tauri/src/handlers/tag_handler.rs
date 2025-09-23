@@ -395,7 +395,16 @@ async fn generate_tags_html(app_handle: &AppHandle, tag_data: &[TagData], roll_w
         std::env::current_dir().unwrap().join("src").join("templates").join("tags").join(template_file_name)
     } else {
         // In production, read from the bundled resources
-        app_handle.path_resolver().app_local_data_dir().unwrap().join("src").join("templates").join("tags").join(template_file_name)
+        let mut base_path = app_handle.path_resolver().app_local_data_dir()
+            .ok_or_else(|| anyhow::anyhow!("Failed to get app local data directory"))?;
+        
+        // Adjust for the observed installation path
+        if base_path.ends_with("com.uclean.app") {
+            base_path.pop(); // Remove "com.uclean.app"
+            base_path.push("UCLEAN"); // Add "UCLEAN"
+        }
+
+        base_path.join("src").join("templates").join("tags").join(template_file_name)
     };
 
     let mut html_content = String::new();
