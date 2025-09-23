@@ -7,7 +7,7 @@
   "author": "UCLEAN Team",
   "license": "MIT",
   "scripts": {
-    "dev": "cross-env PATH=\"$HOME/.cargo/bin:%PATH%\" RUST_LOG=debug tauri dev",
+    "dev": "cross-env PATH=\"$HOME/.cargo/bin:%PATH%\" RUST_LOG=trace tauri dev",
     "dev:debug": "RUST_BACKTRACE=1 RUST_LOG=debug tauri dev",
     "dev:verbose": "RUST_BACKTRACE=full RUST_LOG=trace tauri dev",
     "build": "cross-env PATH=\"$HOME/.cargo/bin:%PATH%\" tauri build",
