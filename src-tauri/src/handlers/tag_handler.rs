@@ -484,11 +484,23 @@ async fn print_tags_html(app_handle: &AppHandle, html_content: &str) -> Result<(
     // Open the file in browser for printing using system command
     let file_path_str = file_path.to_string_lossy().to_string();
 
-    std::process::Command::new("open")
-        .arg(&file_path_str)
-        .spawn()
-        .map_err(|e| anyhow::anyhow!("Failed to open tags HTML for printing: {}", e))?;
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .arg("/C")
+            .arg("start")
+            .arg(&file_path_str)
+            .spawn()
+            .map_err(|e| anyhow::anyhow!("Failed to open tags HTML for printing: {}", e))?;
+    }
 
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&file_path_str)
+            .spawn()
+            .map_err(|e| anyhow::anyhow!("Failed to open tags HTML for printing: {}", e))?;
+    }
     log::info!("Successfully opened tags HTML for printing: {}", file_path_str);
 
     Ok(())

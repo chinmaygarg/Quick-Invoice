@@ -52,7 +52,15 @@ export const TagPrintButton: React.FC<TagPrintButtonProps> = ({
       }
     } catch (error) {
       console.error('Failed to print tags:', error);
-      toast.error('Failed to print tags. Please try again.');
+      let errorMessage = 'An unknown error occurred';
+      if (typeof error === 'object' && error !== null && 'message' in error) {
+        errorMessage = (error as { message: string }).message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else {
+        errorMessage = JSON.stringify(error);
+      }
+      toast.error(`Failed to print tags: ${errorMessage}`);
     } finally {
       setIsPrinting(false);
     }
