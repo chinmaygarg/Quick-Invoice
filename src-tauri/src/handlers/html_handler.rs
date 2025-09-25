@@ -2,9 +2,9 @@ use crate::models::{Invoice, Customer, Store, InvoiceItem, ApiResult, ApiError};
 use crate::services::html_generator::{
     HtmlGenerator, InvoiceHtmlData, InvoiceItemWithDetails, InvoiceAddonDetail, HtmlTotals
 };
+use crate::utils::open_with_default_application;
 use sqlx::Row;
 use tauri::{State, AppHandle, Manager};
-use std::process::Command;
 use std::fs;
 use std::path::PathBuf;
 
@@ -67,10 +67,8 @@ pub async fn save_and_open_invoice_html(
 
     log::info!("Attempting to open HTML file: {}", file_path);
 
-    // Open the file in browser using system command
-    Command::new("open")
-        .arg(&file_path)
-        .spawn()
+    // Open the file in browser using cross-platform command
+    open_with_default_application(&file_path)
         .map_err(|e| ApiError {
             message: format!("Failed to open HTML file: {}", e),
             code: Some("BROWSER_OPEN_ERROR".to_string()),
@@ -142,10 +140,8 @@ pub async fn validate_html_output_path(path: String) -> ApiResult<bool> {
 pub async fn open_html_file(file_path: String, app_handle: AppHandle) -> ApiResult<()> {
     log::info!("Attempting to open HTML file: {}", file_path);
 
-    // Open the file in browser using system command
-    Command::new("open")
-        .arg(&file_path)
-        .spawn()
+    // Open the file in browser using cross-platform command
+    open_with_default_application(&file_path)
         .map_err(|e| ApiError {
             message: format!("Failed to open HTML file: {}", e),
             code: Some("FILE_OPEN_ERROR".to_string()),

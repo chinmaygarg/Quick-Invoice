@@ -4,6 +4,7 @@ use crate::models::{
     TagPrintRequest, TagPrintResponse, InvoiceTagSummary, TagData
 };
 use crate::services::{TagGeneratorService, TemplateEngine};
+use crate::utils::open_with_default_application;
 use tauri::{State, AppHandle, Manager};
 use anyhow::{Result, Context};
 use sqlx::Row;
@@ -481,12 +482,10 @@ async fn print_tags_html(app_handle: &AppHandle, html_content: &str) -> Result<(
     // Write HTML content to file
     fs::write(&file_path, html_content)?;
 
-    // Open the file in browser for printing using system command
+    // Open the file in browser for printing using cross-platform command
     let file_path_str = file_path.to_string_lossy().to_string();
 
-    std::process::Command::new("open")
-        .arg(&file_path_str)
-        .spawn()
+    open_with_default_application(&file_path_str)
         .map_err(|e| anyhow::anyhow!("Failed to open tags HTML for printing: {}", e))?;
 
     log::info!("Successfully opened tags HTML for printing: {}", file_path_str);

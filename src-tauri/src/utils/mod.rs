@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::process::Command;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -179,6 +180,30 @@ pub fn calculate_gst_amount(base_amount: f64, gst_rate: f64) -> f64 {
 pub fn calculate_total_with_gst(base_amount: f64, gst_rate: f64) -> f64 {
     let gst_amount = calculate_gst_amount(base_amount, gst_rate);
     base_amount + gst_amount
+}
+
+// Cross-platform file opening function
+pub fn open_with_default_application(path: &str) -> Result<std::process::Child, std::io::Error> {
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("cmd")
+            .args(["/C", "start", "", path])
+            .spawn()
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(path)
+            .spawn()
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open")
+            .arg(path)
+            .spawn()
+    }
 }
 
 #[cfg(test)]
