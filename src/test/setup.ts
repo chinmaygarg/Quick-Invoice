@@ -13,10 +13,8 @@ configure({
 
 // Mock Tauri API for frontend tests
 const mockTauriAPI = {
-  invoke: jest.fn(),
-  listen: jest.fn(),
-  emit: jest.fn(),
   convertFileSrc: jest.fn((filePath: string) => filePath),
+  invoke: jest.fn(),
 };
 
 // Mock window.__TAURI__ object
@@ -48,17 +46,17 @@ afterEach(() => {
 
 // Global test utilities
 export const mockInvokeSuccess = (result: any) => {
-  (window.__TAURI__.invoke as jest.Mock).mockResolvedValue(result);
+  (mockTauriAPI.invoke as jest.Mock).mockResolvedValue(result);
 };
 
 export const mockInvokeError = (error: string) => {
-  (window.__TAURI__.invoke as jest.Mock).mockRejectedValue(new Error(error));
+  (mockTauriAPI.invoke as jest.Mock).mockRejectedValue(new Error(error));
 };
 
 export const waitForTauriCall = (command: string) => {
   return new Promise(resolve => {
-    const originalInvoke = window.__TAURI__.invoke;
-    (window.__TAURI__.invoke as jest.Mock).mockImplementation((cmd, ...args) => {
+    const originalInvoke = mockTauriAPI.invoke;
+    (mockTauriAPI.invoke as jest.Mock).mockImplementation((cmd, ...args) => {
       if (cmd === command) {
         resolve(args);
       }

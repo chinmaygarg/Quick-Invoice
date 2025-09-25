@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useApp } from '@/contexts/AppContext';
+import { Invoice, InvoiceItem } from '@/types';
 import { CustomerSelector } from './CustomerSelector';
 import { ServiceSelector } from './ServiceSelector';
 import { InvoiceSummary } from './InvoiceSummary';
@@ -20,30 +21,6 @@ interface InvoiceFormData {
   notes: string;
   paymentMethod?: string;
   paymentAmount?: number;
-}
-
-interface InvoiceItem {
-  id?: number;
-  serviceId: number;
-  variantId?: number;
-  serviceName: string;
-  variantName?: string;
-  description?: string;
-  quantity: number;
-  pieceCount?: number;
-  weight?: number;
-  rate: number;
-  amount: number;
-  gstRate: number;
-  addons: InvoiceItemAddon[];
-}
-
-interface InvoiceItemAddon {
-  addonId: number;
-  addonName: string;
-  quantity: number;
-  rate: number;
-  amount: number;
 }
 
 export function InvoiceForm() {
@@ -95,19 +72,40 @@ export function InvoiceForm() {
   const loadInvoiceForEdit = async (invoiceId: number) => {
     try {
       setLoading(true);
-      const invoice = await invoke('get_invoice_by_id', { invoiceId });
+      const invoice = await invoke<Invoice>('get_invoice_by_id', { invoiceId });
 
       // Transform invoice data to form format
       setFormData({
         customerId: invoice.customer_id,
         storeId: invoice.store_id,
-        orderSource: invoice.order_source,
+        orderSource: invoice.order_source || 'counter',
         deliveryDate: invoice.delivery_datetime ? invoice.delivery_datetime.slice(0, 16) : '',
-        items: invoice.items || [],
+        items: (invoice.items || []).map(item => ({
+          id: item.id,
+          service_id: item.service_id,
+          serviceId: item.service_id || item.serviceId || 0,
+          variant_id: item.variant_id,
+          variantId: item.variant_id,
+          description: item.description || '',
+          serviceName: item.description || '',
+          variantName: '',
+          qty: item.qty,
+          quantity: item.qty,
+          piece_count: item.piece_count,
+          pieceCount: item.piece_count,
+          weight_kg: item.weight_kg,
+          rate: item.rate,
+          amount: item.amount,
+          gst_rate: item.gst_rate || item.gstRate || 0,
+          gstRate: item.gst_rate || item.gstRate || 0,
+          sgst: item.sgst || 0,
+          cgst: item.cgst || 0,
+          addons: []
+        })),
         discount: invoice.discount || 0,
         discountType: invoice.discount_type || 'flat',
         expressCharge: invoice.express_charge || 0,
-        gstInclusive: invoice.gst_inclusive === 1,
+        gstInclusive: Boolean(invoice.gst_inclusive),
         notes: invoice.notes || '',
       });
     } catch (error) {
@@ -135,7 +133,8 @@ export function InvoiceForm() {
 
     // Validate each item
     formData.items.forEach((item, index) => {
-      if (item.quantity <= 0) {
+      const quantity = item.quantity || item.qty || 0;
+      if (quantity <= 0) {
         errors[`item_${index}_quantity`] = 'Quantity must be positive';
       }
       if (item.rate <= 0) {
@@ -155,7 +154,7 @@ export function InvoiceForm() {
     return Object.keys(errors).length === 0;
   }, [formData.customerId, formData.items, formData.discount, formData.discountType]);
 
-  const handlePaymentUpdate = useCallback((payment) => {
+  const handlePaymentUpdate = useCallback((payment: any) => {
     setFormData(prev => ({
       ...prev,
       paymentMethod: payment.method,
@@ -166,7 +165,8 @@ export function InvoiceForm() {
 
   const calculateTotals = useMemo(() => {
     const subtotal = formData.items.reduce((sum, item) => {
-      const itemTotal = item.amount + item.addons.reduce((addonSum, addon) => addonSum + addon.amount, 0);
+      const addonsTotal = (item.addons || []).reduce((addonSum: number, addon: any) => addonSum + addon.amount, 0);
+      const itemTotal = item.amount + addonsTotal;
       return sum + itemTotal;
     }, 0);
 
@@ -215,7 +215,8 @@ export function InvoiceForm() {
     // Check each item
     for (let i = 0; i < formData.items.length; i++) {
       const item = formData.items[i];
-      if (item.quantity <= 0 || item.rate <= 0) return false;
+      const quantity = item.quantity || item.qty || 0;
+      if (quantity <= 0 || item.rate <= 0) return false;
     }
 
     if (formData.discount < 0) return false;
@@ -237,8 +238,6 @@ export function InvoiceForm() {
     try {
       setIsSubmitting(true);
 
-      const totals = calculateTotals;
-
       const invoiceData = {
         customer_id: formData.customerId,
         store_id: formData.storeId,
@@ -250,9 +249,9 @@ export function InvoiceForm() {
           description: item.description || null,
           qty: item.quantity,
           piece_count: item.pieceCount ?? null,
-          weight_kg: item.weight ?? null,
+          weight_kg: item.weight_kg ?? null,
           area_sqft: null,
-          addons: item.addons.length > 0 ? item.addons.map(addon => ({
+          addons: (item.addons || []).length > 0 ? (item.addons || []).map((addon: any) => ({
             addon_id: addon.addonId,
             qty: addon.quantity,
           })) : null,
@@ -267,16 +266,16 @@ export function InvoiceForm() {
       };
 
 
-      let invoice;
+      let invoice: Invoice;
       if (id && id !== 'new') {
         // Update existing invoice
-        invoice = await invoke('update_invoice', {
+        invoice = await invoke<Invoice>('update_invoice', {
           invoiceId: parseInt(id),
           request: invoiceData,
         });
       } else {
         // Create new invoice
-        invoice = await invoke('create_invoice', { request: invoiceData });
+        invoice = await invoke<Invoice>('create_invoice', { request: invoiceData });
       }
 
       showNotification({

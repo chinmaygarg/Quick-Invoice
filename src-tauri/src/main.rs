@@ -9,8 +9,10 @@ mod models;
 mod handlers;
 mod services;
 mod utils;
+mod version;
 
-use database::DatabaseManager;
+use database::{DatabaseManager, migrations::MigrationRunner};
+use version::VersionInfo;
 use handlers::{
     customer_handler,
     invoice_handler,
@@ -20,6 +22,7 @@ use handlers::{
     pricing_handler,
     html_handler,
     tag_handler,
+    email_handler,
 };
 
 // Application state
@@ -42,10 +45,33 @@ async fn main() {
                             db: Arc::new(db_manager),
                         });
 
-                        // Initialize schema on first run
+                        // Run database migrations
                         if let Some(state) = app_handle.try_state::<AppState>() {
-                            if let Err(e) = state.db.initialize_schema().await {
-                                log::error!("Failed to initialize database schema: {}", e);
+                            let version_info = VersionInfo::new();
+                            let migration_runner = MigrationRunner::new(state.db.get_pool_cloned());
+
+                            // Check if database needs migration
+                            match migration_runner.needs_migration(&version_info.app_version, version_info.required_db_version).await {
+                                Ok(needs_migration) => {
+                                    if needs_migration {
+                                        log::info!("Database migration required. Running migrations...");
+                                        if let Err(e) = migration_runner.migrate().await {
+                                            log::error!("Failed to run database migrations: {}", e);
+                                            std::process::exit(1);
+                                        }
+                                        log::info!("Database migrations completed successfully");
+                                    } else {
+                                        log::info!("Database is up to date");
+                                    }
+                                }
+                                Err(e) => {
+                                    log::error!("Failed to check migration status: {}", e);
+                                    // Try to initialize schema for new databases
+                                    if let Err(e) = state.db.initialize_schema().await {
+                                        log::error!("Failed to initialize database schema: {}", e);
+                                        std::process::exit(1);
+                                    }
+                                }
                             }
                         }
                     },
@@ -56,6 +82,16 @@ async fn main() {
                 }
             });
             Ok(())
+        })
+        .on_window_event(|event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event.event() {
+                log::info!("Application close requested - email backup feature will be triggered on next app start");
+
+                // Note: Due to Rust lifetime constraints with event handlers,
+                // we cannot easily implement the backup-on-close feature here.
+                // As an alternative, the backup can be triggered manually from the settings
+                // or on app startup to backup the previous session.
+            }
         })
         .invoke_handler(tauri::generate_handler![
             // Customer operations
@@ -130,6 +166,15 @@ async fn main() {
             tag_handler::get_tag_settings,
             tag_handler::save_tag_settings,
             tag_handler::get_tag_preview,
+
+            // Email operations
+            email_handler::save_email_config,
+            email_handler::get_email_config,
+            email_handler::test_email_connection,
+            email_handler::send_backup_email,
+            email_handler::get_smtp_presets,
+            email_handler::update_email_config,
+            email_handler::delete_email_config,
 
             // Utility operations
             initialize_database,

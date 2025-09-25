@@ -1,55 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useApp } from '@/contexts/AppContext';
-
-interface Service {
-  id: number;
-  name: string;
-  unit: string;
-  base_price: number;
-  min_quantity: number;
-  gst_rate: number;
-  is_dynamic: number;
-  hsn_sac_code?: string;
-}
-
-interface ServiceVariant {
-  id: number;
-  service_id: number;
-  variant_name: string;
-  base_price: number;
-  gst_rate: number;
-}
-
-interface ServiceCategory {
-  id: number;
-  name: string;
-}
-
-interface Addon {
-  id: number;
-  name: string;
-  unit?: string;
-  price: number;
-  gst_rate: number;
-}
-
-interface InvoiceItem {
-  id?: number;
-  serviceId: number;
-  variantId?: number;
-  serviceName: string;
-  variantName?: string;
-  description?: string;
-  quantity: number;
-  originalQuantity?: number;
-  pieceCount?: number;
-  weight?: number;
-  rate: number;
-  amount: number;
-  gstRate: number;
-  addons: InvoiceItemAddon[];
-}
+import { Service, ServiceVariant, ServiceCategory, Addon, InvoiceItem } from '@/types';
 
 interface InvoiceItemAddon {
   addonId: number;
@@ -71,9 +23,7 @@ interface ServiceSelectorProps {
 export function ServiceSelector({
   items,
   onAddService,
-  onUpdateService,
   onRemoveService,
-  gstInclusive,
   error,
 }: ServiceSelectorProps) {
   const { showNotification } = useApp();
@@ -108,7 +58,7 @@ export function ServiceSelector({
 
   const loadCategories = async () => {
     try {
-      const categoriesData = await invoke('get_service_categories');
+      const categoriesData = await invoke<ServiceCategory[]>('get_service_categories');
       setCategories(categoriesData);
     } catch (error) {
       console.error('Failed to load categories:', error);
@@ -117,7 +67,7 @@ export function ServiceSelector({
 
   const loadServicesByCategory = async (categoryId: number) => {
     try {
-      const servicesData = await invoke('get_services_by_category', { categoryId });
+      const servicesData = await invoke<Service[]>('get_services_by_category', { categoryId });
       setServices(servicesData);
     } catch (error) {
       console.error('Failed to load services:', error);
@@ -126,7 +76,7 @@ export function ServiceSelector({
 
   const loadServiceVariants = async (serviceId: number) => {
     try {
-      const variantsData = await invoke('get_service_variants', { serviceId });
+      const variantsData = await invoke<ServiceVariant[]>('get_service_variants', { serviceId });
       setVariants(prev => ({ ...prev, [serviceId]: variantsData }));
     } catch (error) {
       console.error('Failed to load variants:', error);
@@ -135,7 +85,7 @@ export function ServiceSelector({
 
   const loadAddons = async () => {
     try {
-      const addonsData = await invoke('get_addons');
+      const addonsData = await invoke<Addon[]>('get_addons');
       setAddons(addonsData);
     } catch (error) {
       console.error('Failed to load addons:', error);
@@ -143,7 +93,7 @@ export function ServiceSelector({
   };
 
   const getCurrentRate = () => {
-    if (selectedVariant) {
+    if (selectedVariant && selectedVariant.base_price != null) {
       return selectedVariant.base_price;
     }
     if (selectedService) {
@@ -153,7 +103,7 @@ export function ServiceSelector({
   };
 
   const getCurrentGstRate = () => {
-    if (selectedVariant) {
+    if (selectedVariant && selectedVariant.gst_rate != null) {
       return selectedVariant.gst_rate;
     }
     if (selectedService) {
@@ -164,7 +114,7 @@ export function ServiceSelector({
 
   const calculateAmount = () => {
     const rate = getCurrentRate();
-    const effectiveQuantity = selectedService && quantity < selectedService.min_quantity
+    const effectiveQuantity = selectedService && selectedService.min_quantity && quantity < selectedService.min_quantity
       ? selectedService.min_quantity
       : quantity;
     return rate * effectiveQuantity;
@@ -215,21 +165,29 @@ export function ServiceSelector({
       return;
     }
 
-    const effectiveQuantity = selectedService && quantity < selectedService.min_quantity
+    const effectiveQuantity = selectedService && selectedService.min_quantity && quantity < selectedService.min_quantity
       ? selectedService.min_quantity
       : quantity;
 
     const item: Omit<InvoiceItem, 'id'> = {
+      service_id: selectedService.id,
       serviceId: selectedService.id,
+      variant_id: selectedVariant?.id,
       variantId: selectedVariant?.id,
+      description: selectedService.name,
       serviceName: selectedService.name,
       variantName: selectedVariant?.variant_name,
+      qty: effectiveQuantity,
       quantity: effectiveQuantity,
-      originalQuantity: selectedService && quantity < selectedService.min_quantity ? quantity : undefined,
+      originalQuantity: selectedService && selectedService.min_quantity && quantity < selectedService.min_quantity ? quantity : undefined,
+      piece_count: pieceCount,
       pieceCount,
       rate: getCurrentRate(),
       amount: calculateAmount(),
+      gst_rate: getCurrentGstRate(),
       gstRate: getCurrentGstRate(),
+      sgst: calculateAmount() * getCurrentGstRate() / 200,
+      cgst: calculateAmount() * getCurrentGstRate() / 200,
       addons: getSelectedAddonsData(),
     };
 
@@ -335,10 +293,10 @@ export function ServiceSelector({
                           Total: {formatCurrency(item.amount)}
                         </span>
                       </div>
-                      {item.addons.length > 0 && (
+                      {(item.addons || []).length > 0 && (
                         <div className="mt-2 pl-3 border-l-2 border-gray-200">
                           <p className="text-xs text-gray-500 mb-1">Add-ons:</p>
-                          {item.addons.map((addon, addonIndex) => (
+                          {(item.addons || []).map((addon, addonIndex) => (
                             <p key={addonIndex} className="text-xs text-gray-600">
                               {addon.addonName} ({addon.quantity} × {formatCurrency(addon.rate)}) = {formatCurrency(addon.amount)}
                             </p>
@@ -421,7 +379,7 @@ export function ServiceSelector({
                             <p className="text-sm text-gray-600">
                               {formatCurrency(service.base_price)} per {service.unit}
                             </p>
-                            {service.min_quantity > 0 && (
+                            {(service.min_quantity || 0) > 0 && (
                               <p className="text-xs text-orange-600">
                                 Min: {service.min_quantity} {service.unit}
                               </p>
@@ -454,7 +412,7 @@ export function ServiceSelector({
                             <div className="flex-1">
                               <p className="font-medium text-gray-900">{variant.variant_name}</p>
                               <p className="text-sm text-gray-600">
-                                {formatCurrency(variant.base_price)} per {selectedService.unit}
+                                {formatCurrency(variant.base_price || 0)} per {selectedService.unit}
                               </p>
                             </div>
                           </label>
@@ -479,7 +437,7 @@ export function ServiceSelector({
                         className="form-input"
                         data-testid="service-quantity"
                       />
-                      {selectedService.min_quantity > 0 && quantity < selectedService.min_quantity && (
+                      {(selectedService.min_quantity || 0) > 0 && quantity < (selectedService.min_quantity || 0) && (
                         <p className="form-help text-orange-600" data-testid="min-quantity-warning">
                           Minimum quantity is {selectedService.min_quantity}{selectedService.unit}. You will be charged for {selectedService.min_quantity}{selectedService.unit}.
                         </p>

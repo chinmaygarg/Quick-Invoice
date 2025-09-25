@@ -1,13 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useApp } from '@/contexts/AppContext';
-
-interface Customer {
-  id: number;
-  name: string;
-  phone?: string;
-  address?: string;
-}
+import { Customer } from '@/types';
 
 interface CustomerSelectorProps {
   selectedCustomerId: number | null;
@@ -56,7 +50,7 @@ export function CustomerSelector({
 
   const loadCustomerDetails = async (customerId: number) => {
     try {
-      const customer = await invoke('get_customer_by_id', { customerId });
+      const customer = await invoke<Customer>('get_customer_by_id', { customerId });
       setSelectedCustomer(customer);
     } catch (error) {
       console.error('Failed to load customer details:', error);
@@ -73,7 +67,7 @@ export function CustomerSelector({
 
     try {
       setIsSearching(true);
-      const results = await invoke('search_customers', {
+      const results = await invoke<Customer[]>('search_customers', {
         query: query.trim(),
         limit: 10,
       });
@@ -104,7 +98,7 @@ export function CustomerSelector({
     }
 
     try {
-      const customer = await invoke('create_customer', {
+      const customer = await invoke<Customer>('create_customer', {
         request: {
           name: newCustomer.name.trim(),
           phone: newCustomer.phone.trim() || null,

@@ -1,4 +1,3 @@
-use crate::database::DatabaseManager;
 use crate::models::{Store, CreateStoreRequest, UpdateStoreRequest, StoreWithStats, ApiResult, ApiError};
 use sqlx::Row;
 use tauri::State;

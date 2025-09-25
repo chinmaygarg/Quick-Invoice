@@ -4,6 +4,8 @@ use std::path::PathBuf;
 use tokio::fs::{self, File};
 use tauri::AppHandle;
 
+pub mod migrations;
+
 pub struct DatabaseManager {
     pool: SqlitePool,
 }

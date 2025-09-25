@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useApp } from '@/contexts/AppContext';
+import { Store } from '@/types';
 
 interface StoreFormData {
   name: string;
@@ -71,7 +72,7 @@ export function StoreForm() {
   const loadStore = async (storeId: number) => {
     try {
       setLoading(true);
-      const store = await invoke('get_store_by_id', { storeId });
+      const store = await invoke<Store>('get_store_by_id', { storeId });
       setFormData({
         name: store.name || '',
         address: store.address || '',
@@ -203,14 +204,14 @@ export function StoreForm() {
         is_active: formData.isActive,
       };
 
-      let store;
+      let store: Store;
       if (id && id !== 'new') {
-        store = await invoke('update_store', {
+        store = await invoke<Store>('update_store', {
           storeId: parseInt(id),
           request: storeData,
         });
       } else {
-        store = await invoke('create_store', {
+        store = await invoke<Store>('create_store', {
           request: storeData,
         });
       }

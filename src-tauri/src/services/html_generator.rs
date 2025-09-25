@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use crate::models::{Invoice, Customer, Store, InvoiceItem, ApiResult, ApiError};
-use crate::services::template_engine::TemplateEngine;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

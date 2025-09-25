@@ -1,34 +1,22 @@
-import React from 'react';
+import { InvoiceItem } from '@/types';
 
-interface InvoiceItem {
+// Generic item type that works for both InvoiceItem and InvoiceFormItem
+type SummaryItem = {
   id?: number;
-  serviceName: string;
+  amount: number;
+  rate: number;
+  addons?: Array<{ amount: number; addonName?: string; quantity?: number; rate?: number }>;
+  // Optional UI-specific properties
+  serviceName?: string;
   variantName?: string;
-  quantity: number;
+  quantity?: number;
   originalQuantity?: number;
-  rate: number;
-  amount: number;
-  addons: InvoiceItemAddon[];
-}
-
-interface InvoiceItemAddon {
-  addonName: string;
-  quantity: number;
-  rate: number;
-  amount: number;
-}
-
-interface InvoiceTotals {
-  subtotal: number;
-  discountAmount: number;
-  baseAmount: number;
-  sgstAmount: number;
-  cgstAmount: number;
-  total: number;
+  // Optional DB-specific properties
+  qty?: number;
 }
 
 interface InvoiceSummaryProps {
-  items: InvoiceItem[];
+  items: SummaryItem[];
   discount: number;
   discountType: 'flat' | 'percent';
   onDiscountChange: (discount: number) => void;
@@ -37,7 +25,7 @@ interface InvoiceSummaryProps {
   onExpressChargeChange: (expressCharge: number) => void;
   gstInclusive: boolean;
   onGstInclusiveChange: (gstInclusive: boolean) => void;
-  onAddService?: (item: Omit<InvoiceItem, 'id'>) => void;
+  onAddService?: (item: any) => void;
   error?: string;
 }
 
@@ -65,7 +53,8 @@ export function InvoiceSummary({
 
   // Calculate totals
   const subtotal = items.reduce((sum, item) => {
-    const itemTotal = item.amount + item.addons.reduce((addonSum, addon) => addonSum + addon.amount, 0);
+    const addonTotal = item.addons ? item.addons.reduce((addonSum, addon) => addonSum + addon.amount, 0) : 0;
+    const itemTotal = item.amount + addonTotal;
     return sum + itemTotal;
   }, 0);
 
@@ -102,17 +91,18 @@ export function InvoiceSummary({
   };
 
   // Quick Action handlers
-  const handleQuickAction = (serviceName: string, serviceId: number, quantity: number, rate: number, unit: string = 'kg') => {
+  const handleQuickAction = (serviceName: string, serviceId: number, quantity: number, rate: number, _unit: string = 'kg') => {
     if (!onAddService) return;
 
     const quickService: Omit<InvoiceItem, 'id'> = {
-      serviceId,
-      serviceName,
-      quantity,
+      service_id: serviceId,
+      description: serviceName,
+      qty: quantity,
       rate,
       amount: quantity * rate,
-      gstRate: 18,
-      addons: []
+      gst_rate: 18,
+      sgst: (quantity * rate * 18) / 200,
+      cgst: (quantity * rate * 18) / 200
     };
 
     onAddService(quickService);
@@ -153,18 +143,18 @@ export function InvoiceSummary({
                         )}
                       </p>
                       <p className="text-gray-600">
-                        {item.quantity} × {formatCurrency(item.rate)}
+                        {(item.quantity || item.qty || 0)} × {formatCurrency(item.rate)}
                         {item.originalQuantity && (
                           <span className="text-xs text-orange-600 block">
-                            (Minimum {item.quantity}kg applied, you entered {item.originalQuantity}kg)
+                            (Minimum {(item.quantity || item.qty || 0)}kg applied, you entered {item.originalQuantity}kg)
                           </span>
                         )}
                       </p>
-                      {item.addons.length > 0 && (
+                      {item.addons && item.addons.length > 0 && (
                         <div className="mt-1 pl-2 border-l-2 border-gray-200">
                           {item.addons.map((addon, addonIndex) => (
                             <p key={addonIndex} className="text-xs text-gray-600">
-                              + {addon.addonName} ({addon.quantity} × {formatCurrency(addon.rate)})
+                              + {addon.addonName} ({addon.quantity || 0} × {formatCurrency(addon.rate || 0)})
                             </p>
                           ))}
                         </div>
@@ -172,7 +162,7 @@ export function InvoiceSummary({
                     </div>
                     <div className="ml-2 text-right">
                       <p className="font-medium text-gray-900">
-                        {formatCurrency(item.amount + item.addons.reduce((sum, addon) => sum + addon.amount, 0))}
+                        {formatCurrency(item.amount + (item.addons || []).reduce((sum, addon) => sum + addon.amount, 0))}
                       </p>
                     </div>
                   </div>

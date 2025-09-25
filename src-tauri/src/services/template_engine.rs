@@ -2,7 +2,6 @@ use crate::models::{ApiResult, ApiError};
 use crate::services::html_generator::InvoiceHtmlData;
 use tera::{Tera, Context};
 use std::collections::HashMap;
-use serde_json::json;
 
 pub struct TemplateEngine {
     tera: Tera,

@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { invoke } from '@tauri-apps/api/tauri';
 import { useApp } from '@/contexts/AppContext';
 import { QuickStats } from './QuickStats';
 import { RecentActivity } from './RecentActivity';

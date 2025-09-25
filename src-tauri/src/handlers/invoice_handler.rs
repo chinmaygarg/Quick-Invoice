@@ -1,10 +1,9 @@
-use crate::database::DatabaseManager;
-use crate::models::{Invoice, InvoiceItem, Customer, Store, CreateInvoiceRequest, CreateInvoiceItemRequest, CreateInvoiceItemAddonRequest, UpdateInvoiceDetailsRequest, ApiResult, ApiError};
-use crate::services::pricing_engine::{PricingEngine, SimplePricing};
+use crate::models::{Invoice, InvoiceItem, Customer, Store, CreateInvoiceRequest, UpdateInvoiceDetailsRequest, ApiResult, ApiError};
+use crate::services::pricing_engine::PricingEngine;
 use sqlx::Row;
 use tauri::State;
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 
 
 #[derive(Debug, Serialize)]
@@ -246,8 +245,28 @@ pub async fn create_invoice(
         }
     }
 
-    // Calculate final totals
-    let final_total = subtotal - request.discount.unwrap_or(0.0) + request.express_charge.unwrap_or(0.0) + total_sgst + total_cgst;
+    // Calculate final totals with proper GST compliance
+    let discount = request.discount.unwrap_or(0.0);
+    let express_charge = request.express_charge.unwrap_or(0.0);
+    let gst_inclusive = request.gst_inclusive.unwrap_or(false);
+
+    let (final_subtotal, final_sgst, final_cgst, final_total) = if gst_inclusive {
+        // For GST inclusive, the item amounts already include GST
+        // Apply discount and express charge to the total
+        let adjusted_total = subtotal - discount + express_charge;
+        (adjusted_total - total_sgst - total_cgst, total_sgst, total_cgst, adjusted_total)
+    } else {
+        // For GST exclusive, recalculate GST on adjusted taxable amount
+        let adjusted_taxable = subtotal - discount + express_charge;
+
+        // Recalculate GST proportionally based on the adjustment
+        let adjustment_factor = if subtotal > 0.0 { adjusted_taxable / subtotal } else { 1.0 };
+        let adjusted_sgst = total_sgst * adjustment_factor;
+        let adjusted_cgst = total_cgst * adjustment_factor;
+        let adjusted_total = adjusted_taxable + adjusted_sgst + adjusted_cgst;
+
+        (adjusted_taxable, adjusted_sgst, adjusted_cgst, adjusted_total)
+    };
 
     // Update invoice with calculated totals
     sqlx::query(
@@ -261,9 +280,9 @@ pub async fn create_invoice(
         WHERE id = ?
         "#
     )
-    .bind(subtotal)
-    .bind(total_sgst)
-    .bind(total_cgst)
+    .bind(final_subtotal)
+    .bind(final_sgst)
+    .bind(final_cgst)
     .bind(final_total)
     .bind(total_pieces)
     .bind(invoice_id)
@@ -273,6 +292,29 @@ pub async fn create_invoice(
         message: format!("Failed to update invoice totals: {}", e),
         code: Some("UPDATE_TOTALS_ERROR".to_string()),
     })?;
+
+    // Update item-level GST amounts proportionally for GST exclusive invoices
+    if !gst_inclusive && subtotal > 0.0 {
+        let adjustment_factor = (final_subtotal + express_charge - discount) / subtotal;
+
+        sqlx::query(
+            r#"
+            UPDATE invoice_items SET
+                sgst = ROUND(sgst * ?, 2),
+                cgst = ROUND(cgst * ?, 2)
+            WHERE invoice_id = ?
+            "#
+        )
+        .bind(adjustment_factor)
+        .bind(adjustment_factor)
+        .bind(invoice_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError {
+            message: format!("Failed to update item GST amounts: {}", e),
+            code: Some("UPDATE_ITEM_GST_ERROR".to_string()),
+        })?;
+    }
 
     // Commit transaction
     tx.commit().await.map_err(|e| ApiError {

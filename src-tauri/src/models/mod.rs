@@ -539,5 +539,79 @@ impl std::fmt::Display for ApiError {
 
 impl std::error::Error for ApiError {}
 
+// Email Configuration Models
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct EmailConfig {
+    pub id: i64,
+    pub sender_email: String,
+    pub encrypted_password: String, // Base64 encoded encrypted password
+    pub recipient_email: String,
+    pub smtp_server: String,
+    pub smtp_port: i32,
+    pub use_tls: i64,
+    pub use_starttls: i64,
+    pub auto_backup_enabled: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateEmailConfigRequest {
+    pub sender_email: String,
+    pub sender_password: String, // Plain text password that will be encrypted
+    pub recipient_email: String,
+    pub smtp_server: String,
+    pub smtp_port: i32,
+    pub use_tls: bool,
+    pub use_starttls: bool,
+    pub auto_backup_enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateEmailConfigRequest {
+    pub sender_email: String,
+    pub sender_password: Option<String>, // None means keep existing password
+    pub recipient_email: String,
+    pub smtp_server: String,
+    pub smtp_port: i32,
+    pub use_tls: bool,
+    pub use_starttls: bool,
+    pub auto_backup_enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmailConfigResponse {
+    pub id: i64,
+    pub sender_email: String,
+    pub recipient_email: String,
+    pub smtp_server: String,
+    pub smtp_port: i32,
+    pub use_tls: bool,
+    pub use_starttls: bool,
+    pub auto_backup_enabled: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmailTestRequest {
+    pub sender_email: String,
+    pub sender_password: String,
+    pub smtp_server: String,
+    pub smtp_port: i32,
+    pub use_tls: bool,
+    pub use_starttls: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackupEmailInfo {
+    pub filename: String,
+    pub app_name: String,
+    pub app_version: String,
+    pub db_version: i32,
+    pub timestamp: String,
+    pub file_size: u64,
+}
+
 // Result type alias
 pub type ApiResult<T> = Result<T, ApiError>;

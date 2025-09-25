@@ -1,14 +1,13 @@
 use crate::database::DatabaseManager;
 use crate::models::{
-    ClothingTag, TagSettings, CreateTagSettingsRequest, UpdateTagSettingsRequest,
+    ClothingTag, TagSettings, UpdateTagSettingsRequest,
     TagPrintRequest, TagPrintResponse, InvoiceTagSummary, TagData
 };
-use crate::services::{TagGeneratorService, TemplateEngine};
+use crate::services::TagGeneratorService;
 use crate::utils::open_with_default_application;
-use tauri::{State, AppHandle, Manager};
+use tauri::{AppHandle, Manager};
 use anyhow::{Result, Context};
 use sqlx::Row;
-use std::sync::Arc;
 
 #[tauri::command]
 pub async fn generate_invoice_tags(

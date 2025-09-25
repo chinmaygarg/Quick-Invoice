@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useApp } from '@/contexts/AppContext';
@@ -36,7 +36,7 @@ export function ServiceList() {
   const [viewMode, setViewMode] = useState<'list' | 'category'>('category');
   const [showInactiveServices, setShowInactiveServices] = useState(false);
   const [selectedServices, setSelectedServices] = useState<number[]>([]);
-  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [, setShowBulkActions] = useState(false);
 
   // Ref for search input to maintain focus
   const searchInputRef = useRef<HTMLInputElement>(null);

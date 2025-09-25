@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '@/contexts/AppContext';
+import { appConfig } from '@/config/app.config';
 
 interface NavItem {
   id: string;
@@ -131,8 +132,8 @@ export function Navigation() {
             <span className="text-white font-bold text-lg">U</span>
           </div>
           <div>
-            <h1 className="text-lg font-bold text-gray-900">UCLEAN</h1>
-            <p className="text-xs text-gray-500">Invoice System</p>
+            <h1 className="text-lg font-bold text-gray-900">{appConfig.name}</h1>
+            <p className="text-xs text-gray-500">{appConfig.app.shortTitle}</p>
           </div>
         </div>
       </div>
@@ -175,15 +176,15 @@ export function Navigation() {
       {/* Footer */}
       <div className="px-6 py-4 border-t border-gray-200">
         <div className="text-xs text-gray-500 text-center">
-          <div>Version 1.0.0</div>
+          <div>Version {appConfig.version}</div>
           <div className="mt-1">
             <a
-              href="https://ucleanlaundry.com"
+              href={appConfig.website.url}
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary-600 hover:text-primary-700"
             >
-              www.ucleanlaundry.com
+              {appConfig.website.displayUrl}
             </a>
           </div>
         </div>

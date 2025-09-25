@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useApp } from '@/contexts/AppContext';
@@ -160,13 +160,13 @@ export function StoreList() {
     );
   };
 
-  const toggleSelectAll = () => {
-    if (selectedStores.length === stores.length) {
-      setSelectedStores([]);
-    } else {
-      setSelectedStores(stores.map(s => s.id));
-    }
-  };
+  // const toggleSelectAll = () => {
+  //   if (selectedStores.length === stores.length) {
+  //     setSelectedStores([]);
+  //   } else {
+  //     setSelectedStores(stores.map(s => s.id));
+  //   }
+  // };
 
   if (isLoading) {
     return (

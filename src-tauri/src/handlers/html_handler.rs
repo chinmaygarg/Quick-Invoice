@@ -4,7 +4,7 @@ use crate::services::html_generator::{
 };
 use crate::utils::open_with_default_application;
 use sqlx::Row;
-use tauri::{State, AppHandle, Manager};
+use tauri::{State, AppHandle};
 use std::fs;
 use std::path::PathBuf;
 

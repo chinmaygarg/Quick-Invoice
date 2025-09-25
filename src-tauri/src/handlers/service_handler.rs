@@ -1,7 +1,6 @@
-use crate::database::DatabaseManager;
 use crate::models::{
     Service, CreateServiceRequest, UpdateServiceRequest, ServiceWithDetails,
-    ServiceVariant, CreateServiceVariantRequest, ServiceAddon, CreateServiceAddonRequest,
+    ServiceVariant, ServiceAddon,
     ServiceCategory, ApiResult, ApiError
 };
 use sqlx::Row;

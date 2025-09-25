@@ -1,6 +1,6 @@
 [package]
 name = "uclean"
-version = "0.1.0"
+version = "0.2.0"
 description = "UCLEAN Invoice Generation System"
 authors = ["UCLEAN Team"]
 license = "MIT"
@@ -28,6 +28,9 @@ rust_decimal = { version = "1.32", features = ["serde-float"] }
 regex = "1.10"
 tera = "1.19"
 urlencoding = "2.1"
+lettre = { version = "0.11", features = ["smtp-transport", "pool", "hostname", "builder", "tokio1-native-tls"] }
+base64 = "0.21"
+mime = "0.3"
 
 [dev-dependencies]
 tempfile = "3.8"

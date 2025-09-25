@@ -1,7 +1,7 @@
 use crate::models::{ClothingTag, CreateClothingTagRequest, TagData, InvoiceWithDetails, TagSettings};
 use crate::database::DatabaseManager;
 use anyhow::{Result, Context};
-use sqlx::{Row, Arguments, Sqlite};
+use sqlx::Row;
 use chrono::Timelike;
 
 pub struct TagGeneratorService;

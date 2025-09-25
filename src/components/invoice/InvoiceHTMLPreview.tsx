@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { invoke } from '@tauri-apps/api/tauri';
-import { open } from '@tauri-apps/api/shell';
 import { toast } from 'react-hot-toast';
 
 interface InvoiceHTMLPreviewProps {

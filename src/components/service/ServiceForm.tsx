@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useApp } from '@/contexts/AppContext';
+import { Service, ServiceCategory, ServiceVariant, ServiceAddon } from '@/types';
 
 interface ServiceFormData {
   name: string;
@@ -16,23 +17,6 @@ interface ServiceFormData {
   addons: ServiceAddon[];
 }
 
-interface ServiceVariant {
-  id?: number;
-  name: string;
-  description: string;
-  priceMultiplier: number;
-  isActive: boolean;
-}
-
-interface ServiceAddon {
-  id?: number;
-  name: string;
-  description: string;
-  price: number;
-  unit: string;
-  isActive: boolean;
-}
-
 interface ValidationErrors {
   name?: string;
   category?: string;
@@ -42,14 +26,6 @@ interface ValidationErrors {
   minQuantity?: string;
   variants?: Record<number, Record<string, string>>;
   addons?: Record<number, Record<string, string>>;
-}
-
-interface ServiceCategory {
-  id: number;
-  name: string;
-  parent_id?: number;
-  is_active: number;
-  created_at: string;
 }
 
 const COMMON_UNITS = [
@@ -67,7 +43,7 @@ const GST_RATES = [0, 5, 12, 18, 28];
 export function ServiceForm() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { showNotification, setLoading } = useApp();
+  const { showNotification } = useApp();
 
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [formData, setFormData] = useState<ServiceFormData>({
@@ -106,9 +82,9 @@ export function ServiceForm() {
           }
 
           const [service, variants, addons] = await Promise.all([
-            invoke('get_service_by_id', { serviceId }),
-            invoke('get_service_variants', { serviceId }),
-            invoke('get_service_addons', { serviceId })
+            invoke<Service>('get_service_by_id', { serviceId }),
+            invoke<ServiceVariant[]>('get_service_variants', { serviceId }),
+            invoke<ServiceAddon[]>('get_service_addons', { serviceId })
           ]);
 
           if (!service) {
@@ -197,7 +173,7 @@ export function ServiceForm() {
         variantError.name = 'Variant name is required';
       }
 
-      if (variant.priceMultiplier <= 0 || variant.priceMultiplier > 10) {
+      if ((variant.priceMultiplier || 0) <= 0 || (variant.priceMultiplier || 0) > 10) {
         variantError.priceMultiplier = 'Price multiplier must be between 0.1 and 10';
       }
 
@@ -223,7 +199,7 @@ export function ServiceForm() {
         addonError.price = 'Price must be greater than 0';
       }
 
-      if (!addon.unit.trim()) {
+      if (!(addon.unit || '').trim()) {
         addonError.unit = 'Unit is required';
       }
 
@@ -266,27 +242,27 @@ export function ServiceForm() {
         is_active: formData.isActive,
         variants: formData.variants.map(v => ({
           name: v.name.trim(),
-          description: v.description.trim() || null,
+          description: (v.description || '').trim() || null,
           price_multiplier: v.priceMultiplier,
           is_active: v.isActive,
         })),
         addons: formData.addons.map(a => ({
           name: a.name.trim(),
-          description: a.description.trim() || null,
+          description: (a.description || '').trim() || null,
           price: a.price,
-          unit: a.unit.trim(),
+          unit: (a.unit || '').trim(),
           is_active: a.isActive,
         })),
       };
 
-      let service;
+      let service: Service;
       if (id && id !== 'new') {
-        service = await invoke('update_service', {
+        service = await invoke<Service>('update_service', {
           serviceId: parseInt(id),
           request: serviceData,
         });
       } else {
-        service = await invoke('create_service', {
+        service = await invoke<Service>('create_service', {
           request: serviceData,
         });
       }
@@ -310,17 +286,23 @@ export function ServiceForm() {
   };
 
   const addVariant = () => {
+    const newVariant: ServiceVariant = {
+      id: 0,
+      service_id: 0,
+      name: '',
+      description: '',
+      priceMultiplier: 1,
+      price_modifier: 1,
+      is_percentage: false,
+      is_active: true,
+      isActive: true,
+      created_at: '',
+      updated_at: '',
+    };
+
     setFormData(prev => ({
       ...prev,
-      variants: [
-        ...prev.variants,
-        {
-          name: '',
-          description: '',
-          priceMultiplier: 1,
-          isActive: true,
-        },
-      ],
+      variants: [...prev.variants, newVariant],
     }));
     setActiveTab('variants');
   };
@@ -342,18 +324,22 @@ export function ServiceForm() {
   };
 
   const addAddon = () => {
+    const newAddon: ServiceAddon = {
+      id: 0,
+      service_id: 0,
+      name: '',
+      description: '',
+      price: 0,
+      unit: 'piece',
+      is_active: true,
+      isActive: true,
+      created_at: '',
+      updated_at: '',
+    };
+
     setFormData(prev => ({
       ...prev,
-      addons: [
-        ...prev.addons,
-        {
-          name: '',
-          description: '',
-          price: 0,
-          unit: 'piece',
-          isActive: true,
-        },
-      ],
+      addons: [...prev.addons, newAddon],
     }));
     setActiveTab('addons');
   };
@@ -727,7 +713,7 @@ export function ServiceForm() {
                         <div>
                           <label className="form-label">Final Price</label>
                           <div className="form-input bg-gray-50 font-medium">
-                            {formatCurrency(formData.basePrice * variant.priceMultiplier)}
+                            {formatCurrency(formData.basePrice * (variant.priceMultiplier || 1))}
                           </div>
                         </div>
                         <div className="flex items-end space-x-2">

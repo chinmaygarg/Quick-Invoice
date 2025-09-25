@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { save, open } from '@tauri-apps/api/dialog';
 import { useApp } from '@/contexts/AppContext';
 import { TagSettings } from '../settings/TagSettings';
+import { EmailSettings } from '../settings/EmailSettings';
 
 export function Settings() {
   const { showNotification, setLoading } = useApp();
@@ -271,6 +272,9 @@ export function Settings() {
           </div>
         </div>
       </div>
+
+      {/* Email Backup Settings */}
+      <EmailSettings />
 
       {/* Tag Printing Settings */}
       <TagSettings />

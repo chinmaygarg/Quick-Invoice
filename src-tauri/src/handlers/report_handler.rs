@@ -1,9 +1,7 @@
-use crate::database::DatabaseManager;
 use crate::models::{ApiResult, ApiError};
 use sqlx::Row;
 use tauri::State;
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc, NaiveDate};
 
 #[derive(Debug, Serialize)]
 pub struct SalesSummary {
@@ -128,7 +126,7 @@ pub async fn get_sales_summary(
         SELECT
             COUNT(*) as total_invoices,
             CAST(COALESCE(SUM(total), 0.0) AS REAL) as total_revenue,
-            CAST(COALESCE(SUM(sgst_amount + cgst_amount + igst_amount), 0.0) AS REAL) as total_tax,
+            CAST(COALESCE(SUM(CAST(sgst_amount AS REAL) + CAST(cgst_amount AS REAL) + CAST(igst_amount AS REAL)), 0.0) AS REAL) as total_tax,
             CAST(COALESCE(SUM(discount), 0.0) AS REAL) as total_discount,
             CAST(COALESCE(AVG(total), 0.0) AS REAL) as average_invoice_value
         FROM invoices
@@ -155,7 +153,7 @@ pub async fn get_sales_summary(
         r#"
         SELECT
             COALESCE(payment_method, 'unknown') as payment_method,
-            CAST(COALESCE(SUM(payment_amount), 0.0) AS REAL) as total_amount
+            CAST(COALESCE(SUM(CAST(payment_amount AS REAL)), 0.0) AS REAL) as total_amount
         FROM invoices
         WHERE DATE(order_datetime) >= ? AND DATE(order_datetime) <= ?
         GROUP BY payment_method
@@ -205,7 +203,7 @@ pub async fn get_sales_summary(
         SELECT
             status,
             COUNT(*) as count,
-            COALESCE(SUM(total), 0) as total_amount
+            CAST(COALESCE(SUM(total), 0.0) AS REAL) as total_amount
         FROM invoices
         WHERE DATE(order_datetime) >= ? AND DATE(order_datetime) <= ?
         GROUP BY status
@@ -235,8 +233,8 @@ pub async fn get_sales_summary(
         SELECT
             DATE(order_datetime) as date,
             COUNT(*) as invoice_count,
-            COALESCE(SUM(total), 0) as total_amount,
-            COALESCE(SUM(sgst_amount + cgst_amount + igst_amount), 0) as tax_amount
+            CAST(COALESCE(SUM(total), 0.0) AS REAL) as total_amount,
+            CAST(COALESCE(SUM(CAST(sgst_amount AS REAL) + CAST(cgst_amount AS REAL) + CAST(igst_amount AS REAL)), 0.0) AS REAL) as tax_amount
         FROM invoices
         WHERE DATE(order_datetime) >= ? AND DATE(order_datetime) <= ?
         GROUP BY DATE(order_datetime)
@@ -280,14 +278,23 @@ pub async fn get_gst_summary(
 ) -> ApiResult<GstSummary> {
     let pool = state.db.get_pool_cloned();
 
-    // Total GST summary
+    // Total GST summary - calculate taxable amount correctly based on GST compliance
     let gst_total_row = sqlx::query(
         r#"
         SELECT
-            COALESCE(SUM(subtotal - discount + express_charge), 0) as total_taxable_amount,
-            COALESCE(SUM(sgst_amount), 0) as total_sgst,
-            COALESCE(SUM(cgst_amount), 0) as total_cgst,
-            COALESCE(SUM(igst_amount), 0) as total_igst
+            CAST(COALESCE(SUM(
+                CASE
+                    WHEN gst_inclusive = 1 THEN
+                        -- For GST inclusive: taxable = (total - discount + express_charge) - tax_amount
+                        (total - discount + express_charge) - (sgst_amount + cgst_amount + igst_amount)
+                    ELSE
+                        -- For GST exclusive: taxable = subtotal - discount + express_charge
+                        subtotal - discount + express_charge
+                END
+            ), 0.0) AS REAL) as total_taxable_amount,
+            CAST(COALESCE(SUM(CAST(sgst_amount AS REAL)), 0.0) AS REAL) as total_sgst,
+            CAST(COALESCE(SUM(CAST(cgst_amount AS REAL)), 0.0) AS REAL) as total_cgst,
+            CAST(COALESCE(SUM(CAST(igst_amount AS REAL)), 0.0) AS REAL) as total_igst
         FROM invoices
         WHERE DATE(order_datetime) >= ? AND DATE(order_datetime) <= ?
         "#
@@ -307,16 +314,25 @@ pub async fn get_gst_summary(
     let total_igst: f64 = gst_total_row.get("total_igst");
     let total_tax_collected = total_sgst + total_cgst + total_igst;
 
-    // GST rate breakdown
+    // GST rate breakdown - calculate correct taxable amount based on GST compliance
     let gst_rate_rows = sqlx::query(
         r#"
         SELECT
             ii.gst_rate,
             COUNT(DISTINCT i.id) as invoice_count,
-            COALESCE(SUM(ii.amount - (ii.sgst + ii.cgst)), 0) as taxable_amount,
-            COALESCE(SUM(ii.sgst), 0) as sgst_amount,
-            COALESCE(SUM(ii.cgst), 0) as cgst_amount,
-            0 as igst_amount
+            CAST(COALESCE(SUM(
+                CASE
+                    WHEN i.gst_inclusive = 1 THEN
+                        -- For GST inclusive: taxable = amount / (1 + gst_rate/100)
+                        ii.amount / (1.0 + ii.gst_rate/100.0)
+                    ELSE
+                        -- For GST exclusive: taxable = amount (before adding GST)
+                        ii.amount
+                END
+            ), 0.0) AS REAL) as taxable_amount,
+            CAST(COALESCE(SUM(CAST(ii.sgst AS REAL)), 0.0) AS REAL) as sgst_amount,
+            CAST(COALESCE(SUM(CAST(ii.cgst AS REAL)), 0.0) AS REAL) as cgst_amount,
+            CAST(0.0 AS REAL) as igst_amount
         FROM invoice_items ii
         JOIN invoices i ON ii.invoice_id = i.id
         WHERE DATE(i.order_datetime) >= ? AND DATE(i.order_datetime) <= ?
@@ -355,8 +371,8 @@ pub async fn get_gst_summary(
         r#"
         SELECT
             strftime('%Y-%m', order_datetime) as month,
-            COALESCE(SUM(subtotal - discount + express_charge), 0) as taxable_amount,
-            COALESCE(SUM(sgst_amount + cgst_amount + igst_amount), 0) as total_tax,
+            CAST(COALESCE(SUM(subtotal - discount + express_charge), 0.0) AS REAL) as taxable_amount,
+            CAST(COALESCE(SUM(CAST(sgst_amount AS REAL) + CAST(cgst_amount AS REAL) + CAST(igst_amount AS REAL)), 0.0) AS REAL) as total_tax,
             COUNT(*) as invoice_count
         FROM invoices
         WHERE DATE(order_datetime) >= ? AND DATE(order_datetime) <= ?
@@ -456,7 +472,7 @@ pub async fn get_customer_summary(
         SELECT
             s.name as service_name,
             COUNT(*) as times_ordered,
-            COALESCE(SUM(ii.amount), 0) as total_amount
+            CAST(COALESCE(SUM(ii.amount), 0.0) AS REAL) as total_amount
         FROM invoice_items ii
         JOIN invoices i ON ii.invoice_id = i.id
         JOIN services s ON ii.service_id = s.id
@@ -536,8 +552,8 @@ pub async fn get_service_popularity(
             s.name as service_name,
             sc.name as category,
             COUNT(ii.id) as times_ordered,
-            COALESCE(SUM(ii.amount), 0) as total_revenue,
-            COALESCE(AVG(ii.amount), 0) as average_price
+            CAST(COALESCE(SUM(ii.amount), 0.0) AS REAL) as total_revenue,
+            CAST(COALESCE(AVG(ii.amount), 0.0) AS REAL) as average_price
         FROM services s
         LEFT JOIN service_categories sc ON s.category_id = sc.id
         LEFT JOIN invoice_items ii ON s.id = ii.service_id
@@ -583,16 +599,13 @@ pub async fn get_express_delivery_summary(
         r#"
         SELECT
             COUNT(*) as total_express_orders,
-            COALESCE(SUM(express_charge), 0) as total_express_revenue,
-            COALESCE(AVG(express_charge), 0) as average_express_charge,
-            COUNT(*) * 100.0 / (SELECT COUNT(*) FROM invoices WHERE DATE(order_datetime) >= ? AND DATE(order_datetime) <= ?) as express_percentage
+            CAST(COALESCE(SUM(express_charge), 0.0) AS REAL) as total_express_revenue,
+            CAST(COALESCE(AVG(express_charge), 0.0) AS REAL) as average_express_charge
         FROM invoices
         WHERE express_charge > 0
         AND DATE(order_datetime) >= ? AND DATE(order_datetime) <= ?
         "#
     )
-    .bind(&date_range.start_date)
-    .bind(&date_range.end_date)
     .bind(&date_range.start_date)
     .bind(&date_range.end_date)
     .fetch_one(&pool)
@@ -602,11 +615,39 @@ pub async fn get_express_delivery_summary(
         code: Some("DATABASE_ERROR".to_string()),
     })?;
 
+    let total_express_orders: i64 = express_row.get("total_express_orders");
+    let total_express_revenue: f64 = express_row.get("total_express_revenue");
+    let average_express_charge: f64 = express_row.get("average_express_charge");
+
+    // Get total invoices for percentage calculation
+    let total_invoices_row = sqlx::query(
+        r#"
+        SELECT COUNT(*) as total_invoices
+        FROM invoices
+        WHERE DATE(order_datetime) >= ? AND DATE(order_datetime) <= ?
+        "#
+    )
+    .bind(&date_range.start_date)
+    .bind(&date_range.end_date)
+    .fetch_one(&pool)
+    .await
+    .map_err(|e| ApiError {
+        message: format!("Database error: {}", e),
+        code: Some("DATABASE_ERROR".to_string()),
+    })?;
+
+    let total_invoices: i64 = total_invoices_row.get("total_invoices");
+    let express_percentage = if total_invoices > 0 {
+        (total_express_orders as f64 / total_invoices as f64) * 100.0
+    } else {
+        0.0
+    };
+
     Ok(serde_json::json!({
-        "total_express_orders": express_row.get::<i64, _>("total_express_orders"),
-        "total_express_revenue": express_row.get::<f64, _>("total_express_revenue"),
-        "average_express_charge": express_row.get::<f64, _>("average_express_charge"),
-        "express_percentage": express_row.get::<f64, _>("express_percentage"),
+        "total_express_orders": total_express_orders,
+        "total_express_revenue": total_express_revenue,
+        "average_express_charge": average_express_charge,
+        "express_percentage": express_percentage,
         "period_start": date_range.start_date,
         "period_end": date_range.end_date,
     }))

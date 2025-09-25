@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useApp } from '@/contexts/AppContext';
@@ -347,7 +347,7 @@ export function CustomerList() {
                     </td>
                     <td className="table-cell">
                       <div className="text-sm text-gray-500">
-                        {formatDate(customer.last_order_date)}
+                        {customer.last_order_date ? formatDate(customer.last_order_date) : 'Never'}
                       </div>
                     </td>
                     <td className="table-cell">

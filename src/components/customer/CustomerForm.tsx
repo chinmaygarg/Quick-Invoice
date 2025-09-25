@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useApp } from '@/contexts/AppContext';
+import { Customer } from '@/types';
 
 interface CustomerFormData {
   name: string;
@@ -43,7 +44,7 @@ export function CustomerForm() {
   const loadCustomer = async (customerId: number) => {
     try {
       setLoading(true);
-      const customer = await invoke('get_customer_by_id', { customerId });
+      const customer = await invoke<Customer>('get_customer_by_id', { customerId });
       setFormData({
         name: customer.name || '',
         phone: customer.phone || '',
@@ -123,16 +124,16 @@ export function CustomerForm() {
         notes: formData.notes.trim() || null,
       };
 
-      let customer;
+      let customer: Customer;
       if (id && id !== 'new') {
         // Update existing customer
-        customer = await invoke('update_customer', {
+        customer = await invoke<Customer>('update_customer', {
           customerId: parseInt(id),
           request: customerData,
         });
       } else {
         // Create new customer
-        customer = await invoke('create_customer', {
+        customer = await invoke<Customer>('create_customer', {
           request: customerData,
         });
       }

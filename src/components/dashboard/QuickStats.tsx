@@ -1,11 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
+import { Customer, Invoice } from '@/types';
 
 interface Stats {
   todaysInvoices: number;
   todaysRevenue: number;
   pendingInvoices: number;
   totalCustomers: number;
+}
+
+interface SalesSummary {
+  total_invoices: number;
+  total_revenue: number;
 }
 
 export function QuickStats() {
@@ -32,14 +38,14 @@ export function QuickStats() {
 
       // Fetch stats in parallel
       const [salesSummary, customers, pendingInvoices] = await Promise.all([
-        invoke('get_sales_summary', {
+        invoke<SalesSummary>('get_sales_summary', {
           dateRange: {
             start_date: todayStart,
             end_date: todayEnd,
           }
         }).catch(() => ({ total_invoices: 0, total_revenue: 0 })),
-        invoke('search_customers', { query: null, limit: 1000 }).catch(() => []),
-        invoke('search_invoices', {
+        invoke<Customer[]>('search_customers', { query: null, limit: 1000 }).catch(() => []),
+        invoke<Invoice[]>('search_invoices', {
           query: {
             status: 'pending',
             limit: 100

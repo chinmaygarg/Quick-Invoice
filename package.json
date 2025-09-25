@@ -1,7 +1,7 @@
 {
   "name": "uclean",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "UCLEAN Invoice Generation System for Laundry and Dry Cleaning Services",
   "author": "UCLEAN Team",

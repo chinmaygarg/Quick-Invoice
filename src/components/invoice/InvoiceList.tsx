@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -8,7 +8,6 @@ import { Modal } from '../common/Modal';
 import { InvoiceHTMLPreview } from './InvoiceHTMLPreview';
 import { TagPrintButton } from './TagPrintButton';
 import { invoke } from '@tauri-apps/api/tauri';
-import { open } from '@tauri-apps/api/shell';
 import { toast } from 'react-hot-toast';
 
 interface Invoice {
@@ -201,7 +200,7 @@ export const InvoiceList: React.FC = () => {
     }
   };
 
-  const handleTagPrintSuccess = (invoiceId: number) => {
+  const handleTagPrintSuccess = (_invoiceId: number) => {
     // Reload tag summary for this specific invoice
     loadInvoices(); // This will refresh the entire list including tag summaries
   };
@@ -304,15 +303,6 @@ export const InvoiceList: React.FC = () => {
     });
   };
 
-  const formatDateTime = (dateString: string): string => {
-    return new Date(dateString).toLocaleString('en-IN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   const getCustomerName = (customerId: number): string => {
     const customer = customers.find(c => c.id === customerId);
