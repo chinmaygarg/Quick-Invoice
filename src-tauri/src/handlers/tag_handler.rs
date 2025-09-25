@@ -117,10 +117,24 @@ pub async fn print_invoice_tags(
             })
         }
         Err(e) => {
-            log::error!("Failed to print tags: {}", e);
+            log::error!("Failed to print tags for invoice {}: {}", request.invoice_id, e);
+
+            // Provide more user-friendly error messages
+            let user_message = if e.to_string().contains("Failed to get app data directory") {
+                "Unable to access app data directory. Please check file permissions and try again.".to_string()
+            } else if e.to_string().contains("Failed to create output directory") {
+                "Unable to create output directory. Please check file permissions.".to_string()
+            } else if e.to_string().contains("Failed to write HTML file") {
+                "Unable to save tag file. Please check available disk space and permissions.".to_string()
+            } else if e.to_string().contains("Failed to open tags HTML") {
+                "Unable to open browser for printing. Please check that you have a default browser installed and try again.".to_string()
+            } else {
+                format!("Print operation failed: {}. Please try again or contact support.", e)
+            };
+
             Ok(TagPrintResponse {
                 success: false,
-                message: format!("Failed to print tags: {}", e),
+                message: user_message,
                 tags_printed: 0,
             })
         }
@@ -465,30 +479,84 @@ async fn print_tags_html(app_handle: &AppHandle, html_content: &str) -> Result<(
     use tauri::api::path;
     use std::fs;
 
+    log::info!("Starting print_tags_html process");
+
     // Create temporary HTML file for tags
     let app_data_dir = path::app_data_dir(&app_handle.config()).ok_or_else(|| {
-        anyhow::anyhow!("Failed to get app data directory")
+        log::error!("Failed to get app data directory");
+        anyhow::anyhow!("Failed to get app data directory - please check app permissions")
     })?;
+
+    log::info!("App data directory: {}", app_data_dir.display());
 
     let output_dir = app_data_dir.join("output");
     if !output_dir.exists() {
-        fs::create_dir_all(&output_dir)?;
+        log::info!("Creating output directory: {}", output_dir.display());
+        fs::create_dir_all(&output_dir).map_err(|e| {
+            log::error!("Failed to create output directory {}: {}", output_dir.display(), e);
+            anyhow::anyhow!("Failed to create output directory: {}", e)
+        })?;
     }
 
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
     let file_name = format!("tags_{}.html", timestamp);
     let file_path = output_dir.join(&file_name);
 
+    log::info!("Creating HTML file: {}", file_path.display());
+
     // Write HTML content to file
-    fs::write(&file_path, html_content)?;
+    fs::write(&file_path, html_content).map_err(|e| {
+        log::error!("Failed to write HTML file {}: {}", file_path.display(), e);
+        anyhow::anyhow!("Failed to write HTML file: {}", e)
+    })?;
+
+    // Verify file was created and has content
+    match fs::metadata(&file_path) {
+        Ok(metadata) => {
+            log::info!("HTML file created successfully, size: {} bytes", metadata.len());
+        }
+        Err(e) => {
+            log::error!("Failed to verify HTML file {}: {}", file_path.display(), e);
+            return Err(anyhow::anyhow!("Failed to verify HTML file creation: {}", e));
+        }
+    }
 
     // Open the file in browser for printing using cross-platform command
     let file_path_str = file_path.to_string_lossy().to_string();
+    log::info!("Attempting to open HTML file for printing: {}", file_path_str);
 
-    open_with_default_application(&file_path_str)
-        .map_err(|e| anyhow::anyhow!("Failed to open tags HTML for printing: {}", e))?;
+    // Convert to file:// URL for better browser handling
+    let file_url = if cfg!(target_os = "windows") {
+        format!("file:///{}", file_path_str.replace("\\", "/"))
+    } else {
+        format!("file://{}", file_path_str)
+    };
 
-    log::info!("Successfully opened tags HTML for printing: {}", file_path_str);
+    log::info!("Using file URL: {}", file_url);
 
+    match open_with_default_application(&file_url) {
+        Ok(child) => {
+            log::info!("Successfully launched browser/application with PID: {:?}", child.id());
+            // Let the process run - don't kill it immediately
+            log::info!("Browser/application started successfully");
+        }
+        Err(e) => {
+            log::error!("Failed to open tags HTML for printing with file URL: {}", e);
+
+            // Try fallback - open without file:// prefix
+            log::info!("Attempting fallback: opening file directly");
+            match open_with_default_application(&file_path_str) {
+                Ok(fallback_child) => {
+                    log::info!("Fallback successful with PID: {:?}", fallback_child.id());
+                }
+                Err(fallback_e) => {
+                    log::error!("Fallback also failed: {}", fallback_e);
+                    return Err(anyhow::anyhow!("Failed to open tags HTML for printing. File URL error: {}. Direct path error: {}. Please check that you have a default browser installed.", e, fallback_e));
+                }
+            }
+        }
+    }
+
+    log::info!("Print process initiated successfully");
     Ok(())
 }
