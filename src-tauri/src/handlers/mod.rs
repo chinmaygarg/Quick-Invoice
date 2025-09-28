@@ -7,3 +7,4 @@ pub mod pricing_handler;
 pub mod html_handler;
 pub mod tag_handler;
 pub mod email_handler;
+pub mod migration_handler;

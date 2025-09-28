@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useApp } from '@/contexts/AppContext';
 
@@ -17,6 +17,7 @@ interface Customer {
 
 export function CustomerList() {
   const { showNotification, setLoading } = useApp();
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -104,7 +105,7 @@ export function CustomerList() {
 
   const handleQuickInvoice = (customer: Customer) => {
     sessionStorage.setItem('quick-selected-customer', JSON.stringify(customer));
-    window.location.href = '/invoice/new';
+    navigate('/invoice/new');
   };
 
   const formatCurrency = (amount: number) => {

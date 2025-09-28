@@ -4,9 +4,11 @@ import { save, open } from '@tauri-apps/api/dialog';
 import { useApp } from '@/contexts/AppContext';
 import { TagSettings } from '../settings/TagSettings';
 import { EmailSettings } from '../settings/EmailSettings';
+import { useMigrationCheck } from '@/hooks/useMigrationCheck';
 
 export function Settings() {
   const { showNotification, setLoading } = useApp();
+  const { checkMigrationAfterRestore } = useMigrationCheck();
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [databasePath, setDatabasePath] = useState<string>('./database.sqlite');
@@ -73,11 +75,19 @@ export function Settings() {
 
       if (filePath && typeof filePath === 'string') {
         await invoke('restore_database', { backupPath: filePath });
-        showNotification({
-          type: 'success',
-          title: 'Restore Complete',
-          message: 'Database restored successfully. Please restart the application.'
-        });
+
+        // Check if the restored database needs migration
+        const migrationResult = await checkMigrationAfterRestore(filePath);
+
+        if (!migrationResult) {
+          // No migration needed, show success message
+          showNotification({
+            type: 'success',
+            title: 'Restore Complete',
+            message: 'Database restored successfully. Please restart the application.'
+          });
+        }
+        // If migration is needed, the migration dialog will be shown automatically
       }
     } catch (error) {
       showNotification({

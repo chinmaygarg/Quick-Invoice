@@ -14,8 +14,30 @@ import { ServiceForm } from '@/components/service/ServiceForm';
 import { Reports } from '@/components/reports/Reports';
 import { Settings } from '@/components/common/Settings';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+import { useMigrationCheck } from '@/hooks/useMigrationCheck';
+import MigrationDialog from '@/components/MigrationDialog';
 
 function App() {
+  const {
+    migrationRequired,
+    migrationData,
+    isChecking,
+    handleMigrationComplete,
+    handleMigrationDismiss,
+  } = useMigrationCheck();
+
+  // Show loading while checking migration status
+  if (isChecking) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Initializing database...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <AppProvider>
@@ -49,6 +71,14 @@ function App() {
               color: '#fff',
             },
           }}
+        />
+
+        {/* Migration Dialog */}
+        <MigrationDialog
+          isOpen={migrationRequired}
+          onClose={handleMigrationDismiss}
+          onComplete={handleMigrationComplete}
+          migrationData={migrationData}
         />
       </AppProvider>
     </ErrorBoundary>

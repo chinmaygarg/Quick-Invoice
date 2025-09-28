@@ -5,6 +5,11 @@ use tokio::fs::{self, File};
 use tauri::AppHandle;
 
 pub mod migrations;
+pub mod version_manager;
+pub mod migration_runner;
+pub mod migration_trigger;
+pub mod embedded_migrations;
+pub mod embedded_tag_templates;
 
 pub struct DatabaseManager {
     pool: SqlitePool,

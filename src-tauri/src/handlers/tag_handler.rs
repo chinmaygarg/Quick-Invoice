@@ -88,7 +88,7 @@ pub async fn print_invoice_tags(
     })?;
 
     // Generate HTML for printing
-    let html_content = generate_tags_html(&tag_data, &settings.roll_width).await.map_err(|e| {
+    let html_content = generate_tags_html(&app_handle, &tag_data, &settings.roll_width).await.map_err(|e| {
         log::error!("Failed to generate tags HTML: {}", e);
         format!("Failed to generate tags HTML: {}", e)
     })?;
@@ -254,7 +254,7 @@ pub async fn get_tag_preview(
 
     let width = roll_width.unwrap_or_else(|| "40mm".to_string());
 
-    generate_tags_html(&tag_data, &width)
+    generate_tags_html(&app_handle, &tag_data, &width)
         .await
         .map_err(|e| {
             log::error!("Failed to generate preview HTML: {}", e);
@@ -393,20 +393,13 @@ async fn update_tag_settings_internal(
     Ok(())
 }
 
-async fn generate_tags_html(tag_data: &[TagData], roll_width: &str) -> Result<String> {
-    let template_path = match roll_width {
-        "32mm" => "src/templates/tags/tag_32mm.html",
-        "40mm" => "src/templates/tags/tag_40mm.html",
-        "50mm" => "src/templates/tags/tag_50mm.html",
-        _ => "src/templates/tags/tag_40mm.html", // Default
-    };
+async fn generate_tags_html(app_handle: &AppHandle, tag_data: &[TagData], roll_width: &str) -> Result<String> {
+    use crate::database::embedded_tag_templates;
 
     let mut html_content = String::new();
 
-    // Read template
-    let template_content = tokio::fs::read_to_string(template_path)
-        .await
-        .context("Failed to read tag template")?;
+    // Get embedded template content directly
+    let template_content = embedded_tag_templates::get_tag_template(roll_width).to_string();
 
     // Generate HTML for each tag
     for (index, tag) in tag_data.iter().enumerate() {

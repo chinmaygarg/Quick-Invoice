@@ -11,8 +11,7 @@ mod services;
 mod utils;
 mod version;
 
-use database::{DatabaseManager, migrations::MigrationRunner};
-use version::VersionInfo;
+use database::DatabaseManager;
 use handlers::{
     customer_handler,
     invoice_handler,
@@ -23,6 +22,7 @@ use handlers::{
     html_handler,
     tag_handler,
     email_handler,
+    migration_handler,
 };
 
 // Application state
@@ -45,34 +45,16 @@ async fn main() {
                             db: Arc::new(db_manager),
                         });
 
-                        // Run database migrations
+                        // Initialize database schema and check for migrations
+                        // Note: The actual migration check and prompt happens in the frontend
+                        // Here we just ensure the basic schema exists
                         if let Some(state) = app_handle.try_state::<AppState>() {
-                            let version_info = VersionInfo::new();
-                            let migration_runner = MigrationRunner::new(state.db.get_pool_cloned());
-
-                            // Check if database needs migration
-                            match migration_runner.needs_migration(&version_info.app_version, version_info.required_db_version).await {
-                                Ok(needs_migration) => {
-                                    if needs_migration {
-                                        log::info!("Database migration required. Running migrations...");
-                                        if let Err(e) = migration_runner.migrate().await {
-                                            log::error!("Failed to run database migrations: {}", e);
-                                            std::process::exit(1);
-                                        }
-                                        log::info!("Database migrations completed successfully");
-                                    } else {
-                                        log::info!("Database is up to date");
-                                    }
-                                }
-                                Err(e) => {
-                                    log::error!("Failed to check migration status: {}", e);
-                                    // Try to initialize schema for new databases
-                                    if let Err(e) = state.db.initialize_schema().await {
-                                        log::error!("Failed to initialize database schema: {}", e);
-                                        std::process::exit(1);
-                                    }
-                                }
+                            // Initialize basic schema if needed
+                            if let Err(e) = state.db.initialize_schema().await {
+                                log::warn!("Schema initialization notice: {}", e);
+                                // This is not fatal as migrations will handle schema creation
                             }
+                            log::info!("Database initialized. Migration check will be performed by frontend.");
                         }
                     },
                     Err(e) => {
@@ -175,6 +157,15 @@ async fn main() {
             email_handler::get_smtp_presets,
             email_handler::update_email_config,
             email_handler::delete_email_config,
+
+            // Migration operations
+            migration_handler::check_migration_on_startup,
+            migration_handler::check_migration_after_restore,
+            migration_handler::apply_pending_migrations,
+            migration_handler::get_migration_details,
+            migration_handler::trigger_manual_migration_check,
+            migration_handler::list_database_backups,
+            migration_handler::cleanup_old_backups,
 
             // Utility operations
             initialize_database,
