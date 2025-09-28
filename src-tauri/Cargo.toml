@@ -9,6 +9,18 @@ default-run = "uclean"
 edition = "2021"
 rust-version = "1.60"
 
+[profile.dev]
+debug = 1                    # Minimal debug info to prevent PDB limit errors
+opt-level = 1                # Slight optimization for better performance
+incremental = false          # Disable incremental compilation to prevent PDB accumulation
+codegen-units = 1           # Reduce parallelization to prevent concurrent PDB access
+split-debuginfo = "packed"   # Better PDB handling on Windows
+
+[profile.dev-fast]
+inherits = "dev"
+debug = 0                    # No debug info for fastest builds
+incremental = false
+
 [build-dependencies]
 tauri-build = { version = "1.5.0", features = [] }
 
@@ -31,6 +43,8 @@ urlencoding = "2.1"
 lettre = { version = "0.11", features = ["smtp-transport", "pool", "hostname", "builder", "tokio1-native-tls"] }
 base64 = "0.21"
 mime = "0.3"
+dirs = "5.0"
+tokio-stream = "0.1"
 
 [dev-dependencies]
 tempfile = "3.8"

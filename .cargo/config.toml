@@ -1,18 +1,11 @@
-# macOS uses the system linker by default which is already optimized
-# No need to specify alternative linkers on macOS
+# Build configuration for Windows
+# Optimized to prevent PDB limit errors (LNK1318)
 
-# Enable incremental compilation for faster rebuilds
-[profile.dev]
-incremental = true
+[build]
+# Use default target directory
+target-dir = "target"
 
-# Optimize debug builds slightly for faster compilation
-[profile.dev.package."*"]
-opt-level = 0
-debug = true
-
-# Fast release builds for development testing
-[profile.dev-release]
-inherits = "release"
-opt-level = 2
-debug = true
-lto = false
+# Windows-specific configuration to handle PDB limits
+[target.x86_64-pc-windows-msvc]
+# Optional: Use LLD linker for better PDB handling (uncomment if needed)
+# rustflags = ["-C", "link-arg=-fuse-ld=lld"]
